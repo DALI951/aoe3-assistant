@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>AoE3 Russia Coach • Live Telemetry &amp; Eco Instant Spam Dashboard</title>
+  <title>AoE3 Russia Coach • Live Telemetry &amp; Eco Instant Spam Dashboard v1.1.0</title>
   <style>
     :root {
       --bg-deep: #0b0e14;
@@ -18,6 +18,12 @@
       --crimson-dim: rgba(230, 57, 70, 0.2);
       --emerald: #10b981;
       --emerald-dim: rgba(16, 185, 129, 0.18);
+      --blue: #38bdf8;
+      --blue-dim: rgba(56, 189, 248, 0.18);
+      --amber: #f59e0b;
+      --amber-dim: rgba(245, 158, 11, 0.18);
+      --gray: #64748b;
+      --gray-dim: rgba(100, 116, 139, 0.2);
       --food-color: #ef4444;
       --wood-color: #d97706;
       --coin-color: #facc15;
@@ -111,7 +117,7 @@
     }
 
     .pill {
-      padding: 5px 11px;
+      padding: 5px 12px;
       border-radius: 999px;
       font-size: 0.78rem;
       font-weight: 700;
@@ -122,10 +128,28 @@
       gap: 6px;
     }
 
-    .pill.live {
+    .pill.state-playing {
       background: var(--emerald-dim);
       border-color: var(--emerald);
       color: #34d399;
+    }
+
+    .pill.state-paused {
+      background: var(--amber-dim);
+      border-color: var(--amber);
+      color: #fbbf24;
+    }
+
+    .pill.state-waiting {
+      background: var(--blue-dim);
+      border-color: var(--blue);
+      color: #38bdf8;
+    }
+
+    .pill.state-not-running {
+      background: var(--gray-dim);
+      border-color: var(--gray);
+      color: #94a3b8;
     }
 
     .pill.age {
@@ -157,12 +181,6 @@
       background: var(--bg-card-hover);
     }
 
-    .btn-small.active {
-      background: var(--gold-dim);
-      border-color: var(--gold);
-      color: var(--gold-bright);
-    }
-
     /* COACH BANNER */
     .coach-banner {
       background: linear-gradient(135deg, #1b2436 0%, #131a27 100%);
@@ -173,6 +191,11 @@
       grid-template-columns: 1.6fr 1fr;
       gap: 14px;
       box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+    }
+
+    .coach-banner.not-running {
+      border-color: var(--border);
+      background: linear-gradient(135deg, #131822 0%, #0d1219 100%);
     }
 
     .coach-banner.in-war {
@@ -206,17 +229,16 @@
       border: 1px solid var(--emerald);
     }
 
-    .War-active .war-badge,
+    .war-badge.not-running {
+      background: var(--gray-dim);
+      color: #94a3b8;
+      border-color: var(--gray);
+    }
+
     .coach-banner.in-war .war-badge {
       background: var(--crimson-dim);
       color: #ff6b6b;
       border-color: var(--crimson);
-      animation: pulseWarn 1.2s infinite;
-    }
-
-    @keyframes pulseWarn {
-      0%, 100% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(1.03); opacity: 0.85; }
     }
 
     .coach-advice-text {
@@ -372,12 +394,6 @@
       color: var(--text-muted);
     }
 
-    .sparkline-svg {
-      width: 100%;
-      height: 30px;
-      display: block;
-    }
-
     .card-food { border-top: 3px solid var(--food-color); }
     .card-food .metric-value, .card-food .rate-badge { color: #f87171; }
 
@@ -404,6 +420,12 @@
       padding: 3px 10px;
       border-radius: 999px;
       box-shadow: 0 0 12px rgba(245, 158, 11, 0.45);
+    }
+
+    .shipment-badge-big.dim {
+      background: #334155;
+      color: #94a3b8;
+      box-shadow: none;
     }
 
     /* 44-CARD DECK SECTION */
@@ -532,8 +554,8 @@
     }
 
     .hc-card.used {
-      opacity: 0.42;
-      background: #101520;
+      opacity: 0.38;
+      background: #0f141d;
       border-color: #1e293b;
     }
 
@@ -648,6 +670,17 @@
       filter: brightness(1.08);
     }
 
+    /* EMPTY STATE OVERLAY */
+    .deck-empty-msg {
+      padding: 24px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      background: var(--bg-card);
+      border-radius: 8px;
+      border: 1px dashed var(--border);
+    }
+
     /* RESPONSIVE BREAKPOINTS */
     @media (max-width: 1200px) {
       .metrics-grid {
@@ -694,33 +727,32 @@
         <div class="brand-title">
           <h1>
             AoE3 Russia Coach
-            <span class="pill age" id="ageBadge">Age I • Discovery Age</span>
+            <span class="pill age" id="ageBadge">No Match Active</span>
           </h1>
           <div class="brand-sub" id="playerSub">
-            Player: <strong>dali</strong> • Home City: <strong>St. Petersburg</strong> • Deck: <strong id="deckNameTop">Eco Instant Spam</strong>
+            Status: <strong id="matchStatusLabel">Game not running — run a game</strong> • Deck: <strong id="deckNameTop">-</strong>
           </div>
         </div>
       </div>
 
       <div class="status-pills">
-        <span class="pill live" id="connPill">● LIVE 1 Hz (age3y.exe)</span>
-        <span class="pill clock" id="gameClock">02:42</span>
-        <button class="btn-small" id="ttsBtn" onclick="toggleTTS()">🔊 Voice Coach: OFF</button>
-        <button class="btn-small" onclick="checkUpdatesModal()">⬆ v1.0.0 Updates</button>
+        <span class="pill state-not-running" id="connPill">● Game Not Running</span>
+        <span class="pill clock" id="gameClock">00:00</span>
+        <button class="btn-small" onclick="checkUpdatesModal()">⬆ v1.1.0 Updates</button>
       </div>
     </header>
 
     <!-- RUSSIA COACH LIVE BANNER -->
-    <section class="coach-banner" id="coachBanner">
+    <section class="coach-banner not-running" id="coachBanner">
       <div class="coach-main">
         <div class="coach-header-row">
-          <span class="war-badge" id="warBadge">PEACE — ECO &amp; AGE-UP PHASE</span>
+          <span class="war-badge not-running" id="warBadge">GAME NOT RUNNING</span>
           <span style="font-size: 0.78rem; color: var(--text-muted);" id="serverEndpointLabel">
             Endpoint: <code id="endpointCode">http://127.0.0.1:8765</code>
           </span>
         </div>
         <div class="coach-advice-text" id="coachAdvice">
-          1 SHIPMENT READY + 838 FOOD BANKED! Click Age Up to Colonial Age (800 Food) right now, and send Distributivism (+1.25 Wood/s trickle) or Economic Theory!
+          Game not running — run a game (waiting for match...)
         </div>
         <div class="alerts-row" id="alertsContainer"></div>
       </div>
@@ -729,25 +761,25 @@
         <div class="rec-card-box">
           <div>
             <div class="rec-label">★ NEXT RECOMMENDED CARD</div>
-            <div class="rec-name" id="recCardName">Distributivism</div>
-            <div class="rec-desc" id="recCardDesc">+1.25 Wood/s Trickle (Age I)</div>
+            <div class="rec-name" id="recCardName">—</div>
+            <div class="rec-desc" id="recCardDesc">Waiting for match to start</div>
           </div>
-          <div class="shipment-badge-big" id="recShipmentChip">1 READY</div>
+          <div class="shipment-badge-big dim" id="recShipmentChip">0 READY</div>
         </div>
 
         <div class="tc-timer-box">
           <div class="tc-timer-header">
-            <span>TC 3-Settler Batch Heartbeat (270 Food)</span>
-            <span id="tcTimerText">READY (838F)</span>
+            <span>TC 3-Settler Batch Heartbeat</span>
+            <span id="tcTimerText">—</span>
           </div>
           <div class="progress-track">
-            <div class="progress-fill" id="tcProgressFill" style="width: 100%; background: var(--emerald);"></div>
+            <div class="progress-fill" id="tcProgressFill" style="width: 0%; background: var(--gray);"></div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- LIVE METRICS & SPARKLINES -->
+    <!-- LIVE METRICS (RESOURCES + RATES + POP/XP) -->
     <section class="metrics-grid">
       <!-- FOOD -->
       <div class="metric-card card-food">
@@ -755,8 +787,7 @@
           <span class="metric-label">🥩 FOOD</span>
           <span class="rate-badge" id="foodRate">+0.00/s</span>
         </div>
-        <div class="metric-value" id="foodVal">838.24</div>
-        <svg class="sparkline-svg" id="foodSpark" viewBox="0 0 120 30" preserveAspectRatio="none"></svg>
+        <div class="metric-value" id="foodVal">0</div>
         <div class="metric-sub" id="foodSub">3-Settler Batch: 270F • Age II: 800F</div>
       </div>
 
@@ -766,8 +797,7 @@
           <span class="metric-label">🪵 WOOD</span>
           <span class="rate-badge" id="woodRate">+0.00/s</span>
         </div>
-        <div class="metric-value" id="woodVal">289.33</div>
-        <svg class="sparkline-svg" id="woodSpark" viewBox="0 0 120 30" preserveAspectRatio="none"></svg>
+        <div class="metric-value" id="woodVal">0</div>
         <div class="metric-sub" id="woodSub">House: 100W • Blockhouse: 250W</div>
       </div>
 
@@ -777,8 +807,7 @@
           <span class="metric-label">🪙 COIN</span>
           <span class="rate-badge" id="coinRate">+0.00/s</span>
         </div>
-        <div class="metric-value" id="coinVal">106.56</div>
-        <svg class="sparkline-svg" id="coinSpark" viewBox="0 0 120 30" preserveAspectRatio="none"></svg>
+        <div class="metric-value" id="coinVal">0</div>
         <div class="metric-sub" id="coinSub">Age III Fortress: 1200F + 1000C</div>
       </div>
 
@@ -786,13 +815,13 @@
       <div class="metric-card card-pop">
         <div class="metric-top">
           <span class="metric-label">🏠 POPULATION</span>
-          <span class="rate-badge" id="popHeadroomBadge">5 free</span>
+          <span class="rate-badge" id="popHeadroomBadge">0 free</span>
         </div>
-        <div class="metric-value" id="popVal">5 / 10</div>
+        <div class="metric-value" id="popVal">0 / 0</div>
         <div class="progress-track">
-          <div class="progress-fill" id="popProgressFill" style="width: 50%; background: var(--pop-color);"></div>
+          <div class="progress-fill" id="popProgressFill" style="width: 0%; background: var(--pop-color);"></div>
         </div>
-        <div class="metric-sub" id="popSub">5 pop headroom remaining</div>
+        <div class="metric-sub" id="popSub">No match active</div>
       </div>
 
       <!-- VILLAGERS -->
@@ -801,24 +830,24 @@
           <span class="metric-label">⚒️ VILLAGERS</span>
           <span class="rate-badge" style="color: #34d399;">Batch x3</span>
         </div>
-        <div class="metric-value" id="villVal">5</div>
+        <div class="metric-value" id="villVal">0</div>
         <div class="progress-track">
-          <div class="progress-fill" id="villProgressFill" style="width: 15%; background: var(--emerald);"></div>
+          <div class="progress-fill" id="villProgressFill" style="width: 0%; background: var(--emerald);"></div>
         </div>
         <div class="metric-sub">Russian Settlers (Max 99)</div>
       </div>
 
-      <!-- SHIPMENTS & XP NEEDED (324 XP) -->
+      <!-- SHIPMENTS & XP (XP/s + XP NEEDED) -->
       <div class="metric-card card-xp">
         <div class="metric-top">
           <span class="metric-label">📦 SHIPMENTS &amp; XP</span>
-          <span class="shipment-badge-big" id="shipmentsVal">1</span>
+          <span class="rate-badge" id="xpRateBadge">+0.00 XP/s</span>
         </div>
-        <div class="metric-value" id="xpNeededVal" style="font-size: 1.35rem;">324 XP needed</div>
+        <div class="metric-value" id="xpNeededVal" style="font-size: 1.35rem;">0 XP needed</div>
         <div class="progress-track">
-          <div class="progress-fill" id="xpProgressFill" style="width: 6.1%; background: var(--xp-color);"></div>
+          <div class="progress-fill" id="xpProgressFill" style="width: 0%; background: var(--xp-color);"></div>
         </div>
-        <div class="metric-sub" id="xpSub">324 XP needed for Shipment #2 (321 / 645 XP)</div>
+        <div class="metric-sub" id="xpSub">0 Shipments Available</div>
       </div>
     </section>
 
@@ -826,8 +855,8 @@
     <section class="deck-panel">
       <div class="deck-header">
         <h2>
-          🃏 Active Deck: <span id="deckNameTitle">Eco Instant Spam</span>
-          <span class="pill" id="deckCountBadge">44 Cards (Age I–IV)</span>
+          🃏 Deck Tracker: <span id="deckNameTitle">Eco Instant Spam</span>
+          <span class="pill" id="deckCountBadge">Used: 0 / 44 (44 remaining)</span>
         </h2>
         <div class="deck-legend">
           <span class="legend-item"><span class="legend-dot" style="background: var(--gold-bright);"></span>★ Recommended Next</span>
@@ -845,7 +874,7 @@
     <!-- SELF-UPDATER & DOWNLOADS -->
     <section class="downloads-panel">
       <div class="dl-info">
-        <h3>⬇ Self-Updating Companion Apps (v1.0.0 • GitHub Releases &amp; Local Mirror)</h3>
+        <h3>⬇ Self-Updating Companion Apps (v1.1.0 • GitHub Releases &amp; Local Mirror)</h3>
         <p id="versionStatusText">
           Auto-updates live from <code>github.com/DALI951/aoe3-assistant/releases/latest</code> &amp; <code>/api/version</code>
         </p>
@@ -865,60 +894,19 @@
   </div>
 
   <script>
-    let ttsEnabled = false;
-    let lastSpokenAdvice = "";
-    let lastSpeakTime = 0;
-
-    function toggleTTS() {
-      ttsEnabled = !ttsEnabled;
-      const btn = document.getElementById("ttsBtn");
-      btn.textContent = ttsEnabled ? "🔊 Voice Coach: ON" : "🔊 Voice Coach: OFF";
-      btn.classList.toggle("active", ttsEnabled);
-      if (ttsEnabled && "speechSynthesis" in window) {
-        const u = new SpeechSynthesisUtterance("Russia Coach voice callouts enabled.");
-        u.rate = 1.08;
-        window.speechSynthesis.speak(u);
-      }
-    }
-
-    function maybeSpeak(text) {
-      if (!ttsEnabled || !("speechSynthesis" in window) || !text) return;
-      const now = Date.now();
-      if (text === lastSpokenAdvice && now - lastSpeakTime < 20000) return;
-      if (now - lastSpeakTime < 7000) return;
-      lastSpokenAdvice = text;
-      lastSpeakTime = now;
-      window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      u.rate = 1.08;
-      window.speechSynthesis.speak(u);
-    }
-
-    function formatRate(val) {
+    function formatRate(val, unit = "/s") {
       const n = Number(val || 0);
-      return (n >= 0 ? "+" : "") + n.toFixed(2) + "/s";
+      return (n >= 0 ? "+" : "") + n.toFixed(2) + unit;
     }
 
-    function drawSparkline(svgId, history, key, strokeColor) {
-      const svg = document.getElementById(svgId);
-      if (!svg || !Array.isArray(history) || history.length < 2) return;
-      const vals = history.map(h => Number(h[key] || 0));
-      const min = Math.min(...vals);
-      const max = Math.max(...vals);
-      const span = Math.max(1, max - min);
-      const pts = vals.map((v, idx) => {
-        const x = (idx / (vals.length - 1)) * 120;
-        const y = 26 - ((v - min) / span) * 22;
-        return `${x.toFixed(1)},${y.toFixed(1)}`;
-      }).join(" ");
-      svg.innerHTML = `
-        <polyline fill="none" stroke="${strokeColor}" stroke-width="2" points="${pts}" />
-      `;
-    }
-
-    function renderDeck(cards, currentAge) {
+    function renderDeck(cards, currentAge, inMatch) {
       const container = document.getElementById("deckRowsContainer");
-      if (!container || !Array.isArray(cards)) return;
+      if (!container) return;
+
+      if (!inMatch || !Array.isArray(cards) || cards.length === 0) {
+        container.innerHTML = `<div class="deck-empty-msg">Waiting for an active match to start... 44 cards in Eco Instant Spam will be tracked live here once AoE3 starts a game.</div>`;
+        return;
+      }
 
       const ageMeta = {
         1: { roman: "AGE I", name: "Discovery" },
@@ -975,10 +963,33 @@
     function renderState(s) {
       if (!s || typeof s !== "object") return;
 
-      // Top bar
-      document.getElementById("ageBadge").textContent = `Age ${s.age_roman || "I"} • ${s.age_name || "Discovery Age"}`;
-      document.getElementById("gameClock").textContent = s.game_time_formatted || "02:42";
-      document.getElementById("deckNameTop").textContent = s.deck_name || "Eco Instant Spam";
+      const inMatch = Boolean(s.in_match);
+      const isPlaying = Boolean(s.is_playing);
+      const isPaused = Boolean(s.is_paused);
+      const gameRunning = Boolean(s.game_running);
+      const matchState = (s.match_state || (gameRunning ? (inMatch ? "PLAYING" : "WAITING_FOR_MATCH") : "GAME_NOT_RUNNING")).toUpperCase();
+
+      // Top bar & Pills
+      const pill = document.getElementById("connPill");
+      if (!gameRunning || matchState === "GAME_NOT_RUNNING") {
+        pill.textContent = "● Game Not Running";
+        pill.className = "pill state-not-running";
+      } else if (matchState === "WAITING_FOR_MATCH") {
+        pill.textContent = "⏳ Waiting for Match...";
+        pill.className = "pill state-waiting";
+      } else if (matchState === "PAUSED" || isPaused) {
+        pill.textContent = "⏸ In Match — Paused";
+        pill.className = "pill state-paused";
+      } else {
+        pill.textContent = "▶ In Match — Playing";
+        pill.className = "pill state-playing";
+      }
+
+      document.getElementById("matchStatusLabel").textContent =
+        s.status_text || (inMatch ? (isPaused ? "Paused" : "Playing") : "Waiting for match");
+      document.getElementById("ageBadge").textContent = inMatch ? `Age ${s.age_roman || "I"} • ${s.age_name || "Discovery"}` : "No Match Active";
+      document.getElementById("gameClock").textContent = s.game_time_formatted || "00:00";
+      document.getElementById("deckNameTop").textContent = s.deck_name || (inMatch ? "Eco Instant Spam" : "-");
       document.getElementById("deckNameTitle").textContent = s.deck_name || "Eco Instant Spam";
 
       if (s.server_info && s.server_info.lan_url) {
@@ -986,93 +997,113 @@
           `${s.server_info.lan_url} • ${s.server_info.remote_domain || "https://modali.powerpme.com"}`;
       }
 
-      // Coach banner & war state
+      // Coach banner
       const banner = document.getElementById("coachBanner");
       const warBadge = document.getElementById("warBadge");
-      banner.classList.toggle("in-war", Boolean(s.in_war));
-      warBadge.textContent = s.war_status || (s.in_war ? "ACTIVE WAR — COMBAT ALERT!" : "PEACE — ECO & AGE-UP PHASE");
+      banner.classList.toggle("not-running", !inMatch);
+      banner.classList.toggle("in-war", inMatch && Boolean(s.in_war));
 
-      document.getElementById("coachAdvice").textContent = s.coach_advice || "";
-      if (s.in_war || (s.shipments_available || 0) > 0) {
-        maybeSpeak(s.coach_advice);
+      if (!inMatch) {
+        warBadge.textContent = matchState === "WAITING_FOR_MATCH" ? "WAITING FOR MATCH..." : "GAME NOT RUNNING";
+        warBadge.className = "war-badge not-running";
+      } else if (s.in_war) {
+        warBadge.textContent = `[${matchState}] ACTIVE WAR — UNIT LOSS DETECTED!`;
+        warBadge.className = "war-badge";
+      } else {
+        warBadge.textContent = `[${matchState}] PEACE — MACRO PHASE`;
+        warBadge.className = "war-badge";
       }
+
+      document.getElementById("coachAdvice").textContent = s.coach_advice || "Game not running — run a game (waiting for match...)";
 
       // Alerts
       const alertsEl = document.getElementById("alertsContainer");
-      if (Array.isArray(s.alerts)) {
+      if (inMatch && Array.isArray(s.alerts) && s.alerts.length > 0) {
         alertsEl.innerHTML = s.alerts.map(a => {
           const lvl = a.level || "info";
           const title = a.title || a.message || "";
           return `<div class="alert-chip ${lvl}"><strong>${title}</strong></div>`;
         }).join("");
+      } else {
+        alertsEl.innerHTML = "";
       }
 
-      // Recommended card
-      const rec = s.recommended_card || {};
-      document.getElementById("recCardName").textContent = rec.name || "Distributivism";
-      document.getElementById("recCardDesc").textContent =
-        `${rec.short_desc || "+1.25 Wood/s Trickle"} (Age ${rec.age || 1})`;
+      // Recommended Card
+      const rec = s.recommended_card;
+      if (inMatch && rec) {
+        document.getElementById("recCardName").textContent = rec.name || "Distributivism";
+        document.getElementById("recCardDesc").textContent = `${rec.short_desc || ""} (Age ${rec.age || 1})`;
+      } else {
+        document.getElementById("recCardName").textContent = "—";
+        document.getElementById("recCardDesc").textContent = inMatch ? "All deck cards sent or none eligible" : "Waiting for match to start";
+      }
 
-      const ships = Number(s.shipments_available ?? 1);
-      document.getElementById("recShipmentChip").textContent = `${ships} READY`;
+      const ships = inMatch ? Number(s.shipments_available ?? 0) : 0;
+      const chipEl = document.getElementById("recShipmentChip");
+      chipEl.textContent = `${ships} READY`;
+      chipEl.classList.toggle("dim", ships === 0);
 
-      // Resources
-      document.getElementById("foodVal").textContent = Number(s.food ?? 838.24).toFixed(2);
-      document.getElementById("woodVal").textContent = Number(s.wood ?? 289.33).toFixed(2);
-      document.getElementById("coinVal").textContent = Number(s.coin ?? 106.56).toFixed(2);
-
-      document.getElementById("foodRate").textContent = formatRate(s.food_per_sec);
-      document.getElementById("woodRate").textContent = formatRate(s.wood_per_sec);
-      document.getElementById("coinRate").textContent = formatRate(s.coin_per_sec);
-
-      // TC batch status
-      const foodNum = Number(s.food ?? 838.24);
+      // TC Status
+      const foodNum = inMatch ? Number(s.food ?? 0) : 0;
       const tcFill = document.getElementById("tcProgressFill");
       const tcText = document.getElementById("tcTimerText");
-      const pctFood = Math.min(100, Math.round((foodNum / 270) * 100));
-      tcFill.style.width = `${pctFood}%`;
-      tcText.textContent = foodNum >= 270 ? `READY (${foodNum.toFixed(0)}F >= 270F)` : `${foodNum.toFixed(0)} / 270 Food`;
+      if (!inMatch) {
+        tcFill.style.width = "0%";
+        tcFill.style.background = "var(--gray)";
+        tcText.textContent = "—";
+      } else {
+        const pctFood = Math.min(100, Math.round((foodNum / 270) * 100));
+        tcFill.style.width = `${pctFood}%`;
+        tcFill.style.background = foodNum >= 270 ? "var(--emerald)" : "var(--amber)";
+        tcText.textContent = foodNum >= 270 ? `READY (${foodNum.toFixed(0)}F >= 270F)` : `${foodNum.toFixed(0)} / 270 Food`;
+      }
+
+      // Resources
+      document.getElementById("foodVal").textContent = inMatch ? Number(s.food ?? 0).toFixed(2) : "0";
+      document.getElementById("woodVal").textContent = inMatch ? Number(s.wood ?? 0).toFixed(2) : "0";
+      document.getElementById("coinVal").textContent = inMatch ? Number(s.coin ?? 0).toFixed(2) : "0";
+
+      document.getElementById("foodRate").textContent = inMatch ? formatRate(s.food_per_sec) : "+0.00/s";
+      document.getElementById("woodRate").textContent = inMatch ? formatRate(s.wood_per_sec) : "+0.00/s";
+      document.getElementById("coinRate").textContent = inMatch ? formatRate(s.coin_per_sec) : "+0.00/s";
+      document.getElementById("xpRateBadge").textContent = inMatch ? formatRate(s.xp_per_sec, " XP/s") : "+0.00 XP/s";
 
       // Pop & Villagers
-      const pop = Number(s.pop ?? 5);
-      const popCap = Math.max(1, Number(s.pop_cap ?? 10));
+      const pop = inMatch ? Number(s.pop ?? 0) : 0;
+      const popCap = inMatch ? Number(s.pop_cap ?? 0) : 0;
       const headroom = Math.max(0, popCap - pop);
-      document.getElementById("popVal").textContent = `${pop} / ${popCap}`;
-      document.getElementById("popHeadroomBadge").textContent = `${headroom} free`;
-      document.getElementById("popProgressFill").style.width = `${Math.min(100, (pop / popCap) * 100)}%`;
-      document.getElementById("popSub").textContent =
-        headroom <= 3 ? "⚠ ALMOST HOUSED! Build House (100W)" : `${headroom} pop headroom remaining`;
+      document.getElementById("popVal").textContent = inMatch ? `${pop} / ${popCap}` : "0 / 0";
+      document.getElementById("popHeadroomBadge").textContent = inMatch ? `${headroom} free` : "0 free";
+      document.getElementById("popProgressFill").style.width = popCap > 0 ? `${Math.min(100, (pop / popCap) * 100)}%` : "0%";
+      document.getElementById("popSub").textContent = inMatch
+        ? (headroom <= 3 ? "⚠ ALMOST HOUSED! Build House (100W)" : `${headroom} pop headroom remaining`)
+        : "No match active";
 
-      const vills = Number(s.villagers ?? 5);
+      const vills = inMatch ? Number(s.villagers ?? 0) : 0;
       document.getElementById("villVal").textContent = `${vills}`;
       document.getElementById("villProgressFill").style.width = `${Math.min(100, (vills / 99) * 100)}%`;
 
-      // Shipments & XP Needed (exact 324 XP)
-      const xpNeeded = Number(s.xp_needed_next ?? 324);
-      const xpCur = Number(s.xp_current ?? 321);
-      const xpNext = Number(s.xp_next_threshold ?? 645);
-      const xpPct = Number(s.xp_progress_pct ?? 6.1);
-      const nextNum = Number(s.next_shipment_number ?? (ships + 1));
+      // XP Needed & Progress
+      const xpNeeded = inMatch ? Number(s.xp_needed_next ?? 0) : 0;
+      const xpCur = inMatch ? Number(s.xp_current ?? 0) : 0;
+      const xpNext = inMatch ? Number(s.xp_next_threshold ?? 0) : 0;
+      const xpPct = inMatch ? Number(s.xp_progress_pct ?? 0) : 0;
 
-      document.getElementById("shipmentsVal").textContent = `${ships}`;
-      document.getElementById("xpNeededVal").textContent = `${xpNeeded} XP needed`;
-      document.getElementById("xpProgressFill").style.width = `${Math.min(100, Math.max(4, xpPct))}%`;
-      document.getElementById("xpSub").textContent =
-        `${xpNeeded} XP needed for Shipment #${nextNum} (${xpCur.toFixed(0)} / ${xpNext.toFixed(0)} XP)`;
+      document.getElementById("xpNeededVal").textContent = inMatch ? `${xpNeeded} XP needed` : "0 XP needed";
+      document.getElementById("xpProgressFill").style.width = inMatch ? `${Math.min(100, Math.max(4, xpPct))}%` : "0%";
+      document.getElementById("xpSub").textContent = inMatch
+        ? `${xpNeeded} XP needed for next shipment (${xpCur.toFixed(0)} / ${xpNext.toFixed(0)} XP)`
+        : "0 Shipments Available";
 
-      // Sparklines
-      if (Array.isArray(s.history)) {
-        drawSparkline("foodSpark", s.history, "food", "#f87171");
-        drawSparkline("woodSpark", s.history, "wood", "#fbbf24");
-        drawSparkline("coinSpark", s.history, "coin", "#fde047");
-      }
+      // Deck Tracker
+      const usedCount = Number(s.cards_used_count ?? 0);
+      const totalCards = Array.isArray(s.cards) && s.cards.length > 0 ? s.cards.length : 44;
+      const remCount = Math.max(0, totalCards - usedCount);
+      document.getElementById("deckCountBadge").textContent = inMatch
+        ? `Cards Used: ${usedCount} / ${totalCards} (${remCount} remaining)`
+        : `Used: 0 / 44 (44 remaining)`;
 
-      // 44-Card Deck Grid
-      if (Array.isArray(s.cards)) {
-        document.getElementById("deckCountBadge").textContent =
-          `${s.cards.filter(c => !c.used).length}/${s.cards.length} Available (Age I–IV)`;
-        renderDeck(s.cards, s.age || 1);
-      }
+      renderDeck(s.cards, s.age || 1, inMatch);
     }
 
     async function fetchInitialState() {
@@ -1100,21 +1131,13 @@
     }
 
     function connectStream() {
-      const pill = document.getElementById("connPill");
       if ("EventSource" in window) {
         const es = new EventSource("/api/stream");
-        es.onopen = () => {
-          pill.textContent = "● LIVE 1 Hz SSE (age3y.exe)";
-          pill.className = "pill live";
-        };
         es.onmessage = (ev) => {
           try {
             const data = JSON.parse(ev.data);
             renderState(data);
           } catch (e) {}
-        };
-        es.onerror = () => {
-          pill.textContent = "⟳ Reconnecting...";
         };
       } else {
         setInterval(fetchInitialState, 1000);

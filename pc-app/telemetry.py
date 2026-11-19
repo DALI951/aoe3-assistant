@@ -1,39 +1,21 @@
 """
-AoE3 Live Read-Only Memory Telemetry Reader (telemetry.py)
+AoE3 Live Read-Only Memory Telemetry Reader (telemetry.py) - v1.1.0
 Strictly READ-ONLY (`PROCESS_VM_READ | PROCESS_QUERY_INFORMATION`) telemetry engine for
 Age of Empires III: The Asian Dynasties (`age3y.exe`, Complete Collection).
 
-Key Reverse-Engineered Architecture (Verified Live on PID 448):
-1. Static Pointer Chain (< 1 ms lookup in any match):
-   - `age3y.exe` image base: `0x00400000`
-   - `g_game = *(base + 0x00866234)` (`0x00C66234`)
-   - `BWorld = *(g_game + 0x13C)`
-   - `player_count = *(BWorld + 0x5C)`
-   - `players_array = *(BWorld + 0x58)`
-   - `BPlayer = *(players_array + 4 * i)` (in PID 448: `0x1426A800` for player 1 `"dali"`)
-
-2. Vtable Signature Scan Fallback (< 0.25s in any match):
-   - `BHomeCity` vtable `0x00BA3B20` -> `+0x08` points to `BPlayer` (`*(BPlayer + 0x84) == BHomeCity`).
-   - `BDeck` vtable `0x00BA3B14` -> `+0x08` UTF-16LE deck name (`"Eco Instant Spam"`),
-     `+0x10` Card Tech DBIDs `uint32*` (`0x1D54F400`), `+0x14` Card count (`44`),
-     `+0x1C` Live Card State array ptr (`0x1E1B8400`).
-
-3. Exact `324` XP-Needed & XOR-Encrypted Resource Array (`*(BPlayer + 0x230)`):
-   - Static 8-DWORD XOR key table at `0x00C6DF14` (`base + 0x0086DF14`, count `8` at `0x00C6DF38`):
-     `[0x2848AC4F, 0x94F83A35, 0x8BD84C3F, 0xAB12FBAF, 0x20B35BCA, 0xF9ABC42A, 0xB1A1CFDA, 0xF2E48210]`
-   - `res_ptr = *(BPlayer + 0x230)` (`0x0FE9A080` in PID 448; `*(BPlayer + 0x240)` is Total Gathered,
-     `*(BPlayer + 0x248)` is Trickle Rates):
-     - Index 0 (`res_ptr + 0x00 ^ 0x2848AC4F`): Coin (`106.5599`)
-     - Index 1 (`res_ptr + 0x04 ^ 0x94F83A35`): Wood (`289.3330`)
-     - Index 2 (`res_ptr + 0x08 ^ 0x8BD84C3F`): Food (`838.2416`)
-     - Index 3 (`res_ptr + 0x0C ^ 0xAB12FBAF`): Fame (`0.0`)
-     - Index 4 (`res_ptr + 0x10 ^ 0x20B35BCA`): SkillPoints (`0.0`)
-     - Index 5 (`res_ptr + 0x14 ^ 0xF9ABC42A`): **Current Match XP** (`0x0FE9A094` -> `321.0`)
-     - Index 6 (`res_ptr + 0x18 ^ 0xB1A1CFDA`): Total Shipments Earned (`1.0`)
-     - Index 7 (`res_ptr + 0x1C ^ 0xF2E48210`): Export (`0.0`)
-   - `xp_next_threshold = *(float32*)(BPlayer + 0x480)` (`645.0`)
-   - `xp_prev_threshold = *(float32*)(BPlayer + 0x484)` (`300.0`)
-   - `xp_needed_next = round(xp_next_threshold - xp_current) = round(645.0 - 321.0) = 324`!
+v1.1.0 Updates:
+- Default data is strictly 0 when game is not running or not in an active match.
+  (NO hardcoded 838.24 / 289.33 / 106.56 fallback values!).
+- Distinguishes exact Match States:
+  - GAME_NOT_RUNNING: "Game not running — run a game (waiting for match...)"
+  - WAITING_FOR_MATCH: "AoE3 running — waiting for a match to start..."
+  - PLAYING: "In Match — Playing"
+  - PAUSED: "In Match — Paused"
+- Detects Playing vs. Paused in real-time from game_time_ms ticks.
+- Computes exact `xp_per_sec` (XP income rate) alongside `food_per_sec`, `wood_per_sec`, `coin_per_sec`.
+- Accurately tracks Used vs. Unused card counts (`cards_used_count`, `cards_remaining_count`,
+  `cards_used_names`, `cards_unused_names`) from BDeck memory.
+- Uses fast reverse-engineered static pointer chain (`< 1 ms`) and vtable scan (`< 0.25s`).
 """
 
 import argparse
@@ -75,8 +57,6 @@ PAGE_GUARD = 0x100
 PAGE_NOACCESS = 0x01
 
 TH32CS_SNAPPROCESS = 0x00000002
-TH32CS_SNAPMODULE = 0x00000008
-TH32CS_SNAPMODULE32 = 0x00000010
 
 # Static age3y.exe addresses & vtables
 AGE3Y_DEFAULT_BASE = 0x00400000
@@ -155,11 +135,8 @@ class PROCESSENTRY32W(ctypes.Structure):
 
 class GatherRateFilter:
     """
-    Calculates exact `food_per_sec`, `wood_per_sec`, `coin_per_sec` from 1 Hz samples
-    while filtering out:
-      - Sudden training/building/tech spend drops (e.g. -270 Food Russian 3-Settler batch,
-        -800 Food Age II click, -100 Wood House, -250 Wood Blockhouse).
-      - Sudden Home City shipment crate spikes (+300, +700, +1000, +1600 crates).
+    Calculates exact `food_per_sec`, `wood_per_sec`, `coin_per_sec`, and `xp_per_sec`
+    from 1 Hz samples while filtering out training spend drops and shipment crate spikes.
     """
 
     def __init__(self, window_sec: float = 8.0):
@@ -170,15 +147,21 @@ class GatherRateFilter:
             "food": deque(maxlen=15),
             "wood": deque(maxlen=15),
             "coin": deque(maxlen=15),
+            "xp": deque(maxlen=15),
         }
-        self._rates: Dict[str, float] = {"food": 0.0, "wood": 0.0, "coin": 0.0}
+        self._rates: Dict[str, float] = {
+            "food": 0.0,
+            "wood": 0.0,
+            "coin": 0.0,
+            "xp": 0.0,
+        }
 
     def reset(self) -> None:
         self._last_time = None
         self._last_vals.clear()
         for q in self._deltas.values():
             q.clear()
-        self._rates = {"food": 0.0, "wood": 0.0, "coin": 0.0}
+        self._rates = {"food": 0.0, "wood": 0.0, "coin": 0.0, "xp": 0.0}
 
     def update(
         self,
@@ -186,30 +169,42 @@ class GatherRateFilter:
         food: float,
         wood: float,
         coin: float,
-        total_gathered: Optional[Dict[str, float]] = None,
-    ) -> Tuple[float, float, float]:
+        xp: float,
+        is_paused: bool = False,
+    ) -> Tuple[float, float, float, float]:
+        if is_paused:
+            return 0.0, 0.0, 0.0, 0.0
+
         if self._last_time is None or game_time_sec < self._last_time - 2.0:
             self._last_time = game_time_sec
-            self._last_vals = {"food": food, "wood": wood, "coin": coin}
-            return self._rates["food"], self._rates["wood"], self._rates["coin"]
+            self._last_vals = {"food": food, "wood": wood, "coin": coin, "xp": xp}
+            return (
+                self._rates["food"],
+                self._rates["wood"],
+                self._rates["coin"],
+                self._rates["xp"],
+            )
 
         dt = game_time_sec - self._last_time
         if dt < 0.05:
-            return self._rates["food"], self._rates["wood"], self._rates["coin"]
+            return (
+                self._rates["food"],
+                self._rates["wood"],
+                self._rates["coin"],
+                self._rates["xp"],
+            )
 
-        current = {"food": food, "wood": wood, "coin": coin}
-        for key in ("food", "wood", "coin"):
+        current = {"food": food, "wood": wood, "coin": coin, "xp": xp}
+        for key in ("food", "wood", "coin", "xp"):
             delta = current[key] - self._last_vals.get(key, current[key])
             inst_rate = delta / dt
 
-            # Filter out spend drops (negative deltas < -5.0) and crate shipment spikes (> +65.0/s)
             is_spend_drop = delta < -5.0
-            is_crate_spike = delta > 120.0 or inst_rate > 45.0
+            is_crate_spike = delta > 120.0 or inst_rate > 55.0
 
             if not is_spend_drop and not is_crate_spike and dt <= 15.0:
                 self._deltas[key].append((game_time_sec, max(0.0, delta), dt))
 
-            # Prune samples outside rolling window
             q = self._deltas[key]
             while q and (game_time_sec - q[0][0]) > self.window_sec:
                 q.popleft()
@@ -221,14 +216,18 @@ class GatherRateFilter:
 
         self._last_time = game_time_sec
         self._last_vals = current
-        return self._rates["food"], self._rates["wood"], self._rates["coin"]
+        return (
+            self._rates["food"],
+            self._rates["wood"],
+            self._rates["coin"],
+            self._rates["xp"],
+        )
 
 
 class TelemetryReader:
     """
     Strictly Read-Only Live Memory Telemetry Reader for `age3y.exe`.
-    Automatically finds `BPlayer`, `BHomeCity`, `BDeck`, and the XOR-encoded 8-resource array
-    (`Coin`, `Wood`, `Food`, `Current XP`, etc.) in <1 second in any match.
+    Detects playing vs paused state, waiting for match, and accurate used cards.
     """
 
     def __init__(
@@ -254,6 +253,11 @@ class TelemetryReader:
         self.bhomecity_addr: int = 0
         self.bdeck_addr: int = 0
         self._last_scan_ts: float = 0.0
+
+        # Playing vs Paused detection state
+        self._prev_game_time_ms: Optional[int] = None
+        self._prev_poll_ts: Optional[float] = None
+        self._paused_consecutive_ticks: int = 0
 
     def _setup_win32(self) -> None:
         k = self._kernel32
@@ -289,6 +293,12 @@ class TelemetryReader:
                 pass
             self.handle = None
             self.pid = None
+        self.bplayer_addr = 0
+        self.bhomecity_addr = 0
+        self.bdeck_addr = 0
+        self._prev_game_time_ms = None
+        self._prev_poll_ts = None
+        self._paused_consecutive_ticks = 0
 
     def find_age3_pid(self) -> Optional[int]:
         """Locate running age3y.exe (or age3.exe / age3x.exe) PID via Toolhelp32 read-only snapshot."""
@@ -318,7 +328,6 @@ class TelemetryReader:
             return False
 
         if self.handle and self.pid == target_pid:
-            # Verify process is still alive and readable
             if self.read_bytes(self.module_base, 4):
                 return True
             self.close()
@@ -375,7 +384,6 @@ class TelemetryReader:
             return ""
 
     def _load_xor_table(self) -> None:
-        """Read the 8-DWORD XOR key table from age3y.exe @ 0x00C6DF14 (with static fallback)."""
         raw = self.read_bytes(self.module_base + OFFSET_XOR_TABLE, 32)
         if len(raw) == 32:
             keys = struct.unpack("<8I", raw)
@@ -385,12 +393,6 @@ class TelemetryReader:
         self.xor_table = DEFAULT_XOR_KEY_TABLE
 
     def decode_xor_resources(self, res_array_ptr: int) -> Optional[Dict[str, float]]:
-        """
-        Decrypt the 8 XOR-obfuscated resource floats at `*(BPlayer + 0x230)` using the static
-        table at `0x00C6DF14`.
-        Indices:
-          0: Coin, 1: Wood, 2: Food, 3: Fame, 4: SkillPoints, 5: Current XP, 6: ShipmentsEarned, 7: Export
-        """
         if not res_array_ptr or res_array_ptr < 0x10000:
             return None
         raw = self.read_bytes(res_array_ptr, 32)
@@ -434,10 +436,6 @@ class TelemetryReader:
         return -1.0 <= res["food"] <= 1e7 and -1.0 <= res["xp"] <= 1e7
 
     def _resolve_bplayer_via_static_chain(self) -> int:
-        """
-        Instant (< 1 ms) static pointer traversal:
-        *(0x00C66234) -> +0x13C (BWorld) -> +0x58 (players_array) / +0x5C (player_count).
-        """
         g_game = self.read_u32(self.module_base + OFFSET_G_GAME)
         if not g_game:
             return 0
@@ -453,7 +451,6 @@ class TelemetryReader:
         for idx in range(1, p_count):
             bp = self.read_u32(p_arr + idx * 4)
             if bp and self._validate_bplayer(bp):
-                # Prefer player 1 or player with valid BHomeCity
                 bhc = self.read_u32(bp + 0x084) or 0
                 if bhc and self.read_u32(bhc) == VTABLE_BHOMECITY:
                     self.bhomecity_addr = bhc
@@ -463,7 +460,6 @@ class TelemetryReader:
         return best_bp
 
     def _iter_heap_regions(self):
-        """Yield (base_address, region_size) for committed readable heap regions."""
         is_64 = ctypes.sizeof(ctypes.c_void_p) == 8
         mbi = MEMORY_BASIC_INFORMATION64() if is_64 else MEMORY_BASIC_INFORMATION32()
         mbi_size = ctypes.sizeof(mbi)
@@ -493,10 +489,6 @@ class TelemetryReader:
             addr = base + size
 
     def _scan_vtables(self) -> Tuple[int, int, int]:
-        """
-        Fast (< 0.25s) vtable signature scan for BHomeCity (0x00BA3B20) and BDeck (0x00BA3B14).
-        Finds BPlayer via *(BHomeCity + 0x08) and active BDeck with 44 cards ("Eco Instant Spam").
-        """
         pat_hc = struct.pack("<I", VTABLE_BHOMECITY)
         pat_deck = struct.pack("<I", VTABLE_BDECK)
 
@@ -514,7 +506,6 @@ class TelemetryReader:
                 if not buf:
                     break
 
-                # 1. Search BHomeCity vtable (0x00BA3B20) if BPlayer not yet resolved
                 if not found_bp:
                     pos = buf.find(pat_hc)
                     while pos != -1:
@@ -527,7 +518,6 @@ class TelemetryReader:
                                 break
                         pos = buf.find(pat_hc, pos + 4)
 
-                # 2. Search BDeck vtable (0x00BA3B14)
                 pos = buf.find(pat_deck)
                 while pos != -1:
                     if pos + 0x24 <= len(buf):
@@ -555,7 +545,6 @@ class TelemetryReader:
         return found_bp, found_hc, best_deck
 
     def discover_structures(self) -> bool:
-        """Ensure BPlayer, BHomeCity, and BDeck addresses are resolved for the current match."""
         if not self.attach():
             return False
 
@@ -588,41 +577,40 @@ class TelemetryReader:
         return vt == VTABLE_BDECK and 1 <= count <= 60 and tech_ptr > 0x10000 and name_ptr > 0x10000
 
     def _read_live_deck(self) -> Tuple[str, List[Dict[str, Any]]]:
-        """Read active deck name and 44 cards with live used/unused status from BDeck + HomeCity XML."""
         cards = load_deck_from_homecity_xml(self.homecity_xml_path, "Eco Instant Spam")
         deck_name = "Eco Instant Spam"
 
         if not self._validate_bdeck(self.bdeck_addr):
             return deck_name, cards
 
-        raw = self.read_bytes(self.bdeck_addr, 0x24)
+        raw = self.read_bytes(self.bdeck_addr, 0x60)
         name_ptr = struct.unpack_from("<I", raw, 0x08)[0]
         tech_ptr = struct.unpack_from("<I", raw, 0x10)[0]
         count = struct.unpack_from("<I", raw, 0x14)[0]
         state_ptr = struct.unpack_from("<I", raw, 0x1C)[0]
+        state2_ptr = struct.unpack_from("<I", raw, 0x48)[0] if len(raw) >= 0x4C else 0
+        state3_ptr = struct.unpack_from("<I", raw, 0x54)[0] if len(raw) >= 0x58 else 0
 
         live_name = self.read_utf16(name_ptr, 40)
         if live_name:
             deck_name = live_name
 
-        # Read tech DBIDs array
-        tech_bytes = self.read_bytes(tech_ptr, count * 4)
-        dbids: List[int] = (
-            list(struct.unpack(f"<{count}I", tech_bytes))
-            if len(tech_bytes) == count * 4
-            else [c["dbid"] for c in cards]
-        )
+        dbids: List[int] = []
+        if tech_ptr > 0x10000 and 1 <= count <= 60:
+            tech_bytes = self.read_bytes(tech_ptr, count * 4)
+            if len(tech_bytes) == count * 4:
+                dbids = list(struct.unpack(f"<{count}I", tech_bytes))
 
-        # Read live card state array at *(BDeck + 0x1C)
-        used_flags: Dict[int, bool] = {}
-        if state_ptr and state_ptr > 0x10000:
-            state_bytes = self.read_bytes(state_ptr, count * 4)
-            if len(state_bytes) == count * 4:
-                state_vals = struct.unpack(f"<{count}I", state_bytes)
-                # Verify if state array holds small usage counts/flags (0 = unused, 1..10 = sent count)
-                if all(v <= 64 for v in state_vals) and any(v == 0 for v in state_vals):
-                    for idx, v in enumerate(state_vals):
-                        used_flags[idx] = (v > 0)
+        used_map: Dict[int, int] = {}
+        for s_ptr in (state_ptr, state2_ptr, state3_ptr):
+            if s_ptr and s_ptr > 0x10000:
+                s_bytes = self.read_bytes(s_ptr, count * 4)
+                if len(s_bytes) == count * 4:
+                    s_vals = struct.unpack(f"<{count}I", s_bytes)
+                    if any(0 < v < 100 for v in s_vals):
+                        for idx, v in enumerate(s_vals):
+                            if v > 0:
+                                used_map[idx] = max(used_map.get(idx, 0), v)
 
         for idx, c in enumerate(cards):
             if idx < len(dbids) and dbids[idx] in CARD_BY_DBID:
@@ -633,28 +621,188 @@ class TelemetryReader:
                 c["name"] = meta["name"]
                 c["short_desc"] = meta["short_desc"]
                 c["category"] = meta["category"]
-            if idx in used_flags and not c.get("infinite", False):
-                c["used"] = used_flags[idx]
+            if idx in used_map:
+                c["used_count"] = used_map[idx]
+                c["used"] = (used_map[idx] > 0)
+            else:
+                c["used_count"] = 0
+                c["used"] = False
 
         return deck_name, cards
 
+    def get_game_not_running_snapshot(self) -> Dict[str, Any]:
+        """Strict default 0 snapshot when age3y.exe is not running at all."""
+        self.rate_filter.reset()
+        base = {
+            "connected": False,
+            "process_attached": False,
+            "game_running": False,
+            "in_match": False,
+            "is_playing": False,
+            "is_paused": False,
+            "match_state": "GAME_NOT_RUNNING",
+            "status_text": "Game not running — run a game (waiting for match...)",
+            "process_name": "age3y.exe",
+            "pid": 0,
+            "player_name": "",
+            "civ": "",
+            "civ_id": 0,
+            "homecity": "",
+            "homecity_file": "",
+            "homecity_xml": "",
+            "food": 0.0,
+            "wood": 0.0,
+            "coin": 0.0,
+            "fame": 0.0,
+            "export": 0.0,
+            "food_per_sec": 0.0,
+            "wood_per_sec": 0.0,
+            "coin_per_sec": 0.0,
+            "xp_per_sec": 0.0,
+            "pop": 0,
+            "pop_cap": 0,
+            "pop_headroom": 0,
+            "villagers": 0,
+            "shipments_available": 0,
+            "total_shipments_earned": 0,
+            "next_shipment_number": 0,
+            "xp_current": 0.0,
+            "xp_needed_next": 0,
+            "xp_needed": 0,
+            "xp_next_threshold": 0.0,
+            "xp_prev_threshold": 0.0,
+            "xp_progress_pct": 0.0,
+            "age": 0,
+            "age_roman": "",
+            "age_name": "",
+            "game_time_ms": 0,
+            "game_time_sec": 0.0,
+            "deck_name": "",
+            "deck_card_count": 0,
+            "cards": [],
+            "cards_used_count": 0,
+            "cards_remaining_count": 0,
+            "cards_used_names": [],
+            "cards_unused_names": [],
+            "next_recommended_card": "",
+            "recommended_card": None,
+            "coach_advice": "Game not running — run a game (waiting for match...)",
+            "coach_advice_list": ["Game not running — run a game (waiting for match...)"],
+            "alerts": [],
+            "in_war": False,
+            "war_status": "PEACE",
+            "unit_loss_count": 0,
+            "tc_idle_sec": 0.0,
+            "tc_batch_timer_sec": 0.0,
+            "tc_batch_cycle_sec": 0.0,
+            "tc_batch_remaining_sec": 0.0,
+            "tc_idle_warning": False,
+            "tc_status": "",
+            "tc_batch_status": "",
+        }
+        coach_res = self.coach.evaluate(base)
+        base.update(coach_res)
+        return base
+
+    def get_waiting_for_match_snapshot(self) -> Dict[str, Any]:
+        """Strict default 0 snapshot when age3y.exe is running in main menu / waiting for a match."""
+        self.rate_filter.reset()
+        base = {
+            "connected": True,
+            "process_attached": True,
+            "game_running": True,
+            "in_match": False,
+            "is_playing": False,
+            "is_paused": False,
+            "match_state": "WAITING_FOR_MATCH",
+            "status_text": "AoE3 running — waiting for a match to start...",
+            "process_name": "age3y.exe",
+            "pid": self.pid or 0,
+            "player_name": "",
+            "civ": "",
+            "civ_id": 0,
+            "homecity": "",
+            "homecity_file": "",
+            "homecity_xml": "",
+            "food": 0.0,
+            "wood": 0.0,
+            "coin": 0.0,
+            "fame": 0.0,
+            "export": 0.0,
+            "food_per_sec": 0.0,
+            "wood_per_sec": 0.0,
+            "coin_per_sec": 0.0,
+            "xp_per_sec": 0.0,
+            "pop": 0,
+            "pop_cap": 0,
+            "pop_headroom": 0,
+            "villagers": 0,
+            "shipments_available": 0,
+            "total_shipments_earned": 0,
+            "next_shipment_number": 0,
+            "xp_current": 0.0,
+            "xp_needed_next": 0,
+            "xp_needed": 0,
+            "xp_next_threshold": 0.0,
+            "xp_prev_threshold": 0.0,
+            "xp_progress_pct": 0.0,
+            "age": 0,
+            "age_roman": "",
+            "age_name": "",
+            "game_time_ms": 0,
+            "game_time_sec": 0.0,
+            "deck_name": "",
+            "deck_card_count": 0,
+            "cards": [],
+            "cards_used_count": 0,
+            "cards_remaining_count": 0,
+            "cards_used_names": [],
+            "cards_unused_names": [],
+            "next_recommended_card": "",
+            "recommended_card": None,
+            "coach_advice": "AoE3 running — waiting for a match to start...",
+            "coach_advice_list": ["AoE3 running — waiting for a match to start..."],
+            "alerts": [],
+            "in_war": False,
+            "war_status": "PEACE",
+            "unit_loss_count": 0,
+            "tc_idle_sec": 0.0,
+            "tc_batch_timer_sec": 0.0,
+            "tc_batch_cycle_sec": 0.0,
+            "tc_batch_remaining_sec": 0.0,
+            "tc_idle_warning": False,
+            "tc_status": "",
+            "tc_batch_status": "",
+        }
+        coach_res = self.coach.evaluate(base)
+        base.update(coach_res)
+        return base
+
     def read_snapshot(self) -> Dict[str, Any]:
         """
-        Read a complete telemetry snapshot from age3y.exe (or return the verified PID 448
-        paused snapshot when age3y.exe is not actively running) and enrich with CoachEngine.
+        Read complete telemetry snapshot.
+        If age3y.exe is not running -> GAME_NOT_RUNNING (0s).
+        If age3y.exe is running but not in match -> WAITING_FOR_MATCH (0s).
+        If in match -> PLAYING / PAUSED with live decoded resources, rates, and 44 cards.
         """
-        if self.discover_structures():
-            live = self._read_live_bplayer_snapshot()
-            if live is not None:
-                coach_fields = self.coach.evaluate(live)
-                live.update(coach_fields)
-                return live
+        target_pid = self.find_age3_pid()
+        if not target_pid:
+            self.close()
+            return self.get_game_not_running_snapshot()
 
-        # Baseline verified PID 448 paused snapshot
-        baseline = self.get_pid448_baseline_snapshot()
-        coach_fields = self.coach.evaluate(baseline)
-        baseline.update(coach_fields)
-        return baseline
+        if not self.attach(target_pid):
+            return self.get_game_not_running_snapshot()
+
+        if not self.discover_structures():
+            return self.get_waiting_for_match_snapshot()
+
+        live = self._read_live_bplayer_snapshot()
+        if live is None:
+            return self.get_waiting_for_match_snapshot()
+
+        coach_fields = self.coach.evaluate(live)
+        live.update(coach_fields)
+        return live
 
     def _read_live_bplayer_snapshot(self) -> Optional[Dict[str, Any]]:
         bp = self.bplayer_addr
@@ -671,7 +819,6 @@ class TelemetryReader:
         hc_file_ptr = struct.unpack_from("<I", data, 0x0AC)[0]
         game_time_ms = struct.unpack_from("<I", data, 0x104)[0]
         res_ptr = struct.unpack_from("<I", data, 0x230)[0]
-        tot_res_ptr = struct.unpack_from("<I", data, 0x240)[0]
         shipments_avail = struct.unpack_from("<I", data, 0x46C)[0]
         xp_next = struct.unpack_from("<f", data, 0x480)[0]
         xp_prev = struct.unpack_from("<f", data, 0x484)[0]
@@ -679,7 +826,33 @@ class TelemetryReader:
         res = self.decode_xor_resources(res_ptr)
         if res is None:
             return None
-        tot_res = self.decode_xor_resources(tot_res_ptr)
+
+        # Detect Playing vs Paused from game_time_ms progression
+        now_wall = time.time()
+        if self._prev_game_time_ms is not None and self._prev_poll_ts is not None:
+            wall_dt = now_wall - self._prev_poll_ts
+            game_dt_ms = game_time_ms - self._prev_game_time_ms
+            if wall_dt >= 0.2:
+                if game_dt_ms <= 0:
+                    self._paused_consecutive_ticks += 1
+                else:
+                    self._paused_consecutive_ticks = 0
+        else:
+            time.sleep(0.06)
+            t2 = self.read_u32(bp + 0x104) or game_time_ms
+            if t2 > game_time_ms:
+                self._paused_consecutive_ticks = 0
+                game_time_ms = t2
+            else:
+                self._paused_consecutive_ticks = 1
+
+        self._prev_game_time_ms = game_time_ms
+        self._prev_poll_ts = now_wall
+
+        is_paused = (self._paused_consecutive_ticks >= 1)
+        is_playing = not is_paused
+        match_state = "PAUSED" if is_paused else "PLAYING"
+        status_text = "In Match — Paused" if is_paused else "In Match — Playing"
 
         food = round(max(0.0, res["food"]), 2)
         wood = round(max(0.0, res["wood"]), 2)
@@ -697,8 +870,8 @@ class TelemetryReader:
         xp_pct = round(min(100.0, max(0.0, ((xp_cur - xp_prev) / span) * 100.0)), 1)
 
         game_time_sec = round(game_time_ms / 1000.0, 3)
-        fps, wps, cps = self.rate_filter.update(
-            game_time_sec, food, wood, coin, total_gathered=tot_res
+        fps, wps, cps, xps = self.rate_filter.update(
+            game_time_sec, food, wood, coin, xp_cur, is_paused=is_paused
         )
 
         player_name = self.read_utf16(name_ptr, 32) or "dali"
@@ -706,11 +879,20 @@ class TelemetryReader:
         villagers = vills_350 if 0 < vills_350 <= 100 else vills_58
 
         deck_name, cards = self._read_live_deck()
+        cards_used_count = sum(1 for c in cards if c.get("used", False))
+        cards_remaining_count = len(cards) - cards_used_count
+        cards_used_names = [c["name"] for c in cards if c.get("used", False)]
+        cards_unused_names = [c["name"] for c in cards if not c.get("used", False)]
 
         return {
             "connected": True,
             "process_attached": True,
-            "snapshot_mode": "live_memory",
+            "game_running": True,
+            "in_match": True,
+            "is_playing": is_playing,
+            "is_paused": is_paused,
+            "match_state": match_state,
+            "status_text": status_text,
             "process_name": "age3y.exe",
             "pid": self.pid or 448,
             "player_name": player_name,
@@ -727,6 +909,7 @@ class TelemetryReader:
             "food_per_sec": fps,
             "wood_per_sec": wps,
             "coin_per_sec": cps,
+            "xp_per_sec": xps,
             "pop": pop,
             "pop_cap": pop_cap,
             "pop_headroom": max(0, pop_cap - pop),
@@ -743,7 +926,12 @@ class TelemetryReader:
             "game_time_ms": game_time_ms,
             "game_time_sec": game_time_sec,
             "deck_name": deck_name,
+            "deck_card_count": len(cards),
             "cards": cards,
+            "cards_used_count": cards_used_count,
+            "cards_remaining_count": cards_remaining_count,
+            "cards_used_names": cards_used_names,
+            "cards_unused_names": cards_unused_names,
             "xp_address_info": {
                 "bplayer_addr": f"0x{bp:08X}",
                 "bhomecity_addr": f"0x{self.bhomecity_addr:08X}",
@@ -756,74 +944,6 @@ class TelemetryReader:
             },
         }
 
-    def get_pid448_baseline_snapshot(self) -> Dict[str, Any]:
-        """
-        Return the exact verified snapshot from paused PID 448 (`age3y.exe`):
-        - Player: `dali` (Russians, Civ ID 12)
-        - Food: `838.24` (`838.2416`), Wood: `289.33` (`289.3330`), Coin: `106.56` (`106.5599`)
-        - Pop: `5/10`, Villagers: `5`
-        - Available Shipments: `1`
-        - Current XP: `321.0` (`*(0x1426A800 + 0x230) + 0x14` = `0x0FE9A094` ^ `0xF9ABC42A`),
-          Next Shipment Threshold: `645.0` (`0x1426A800 + 0x480`),
-          Prev Shipment Threshold: `300.0` (`0x1426A800 + 0x484`),
-          Exact XP Needed for Next Shipment: `round(645.0 - 321.0) = 324`!
-        - Active Deck: `"Eco Instant Spam"` (44 cards parsed from `sp_St. Petersburg_homecity.xml`).
-        """
-        cards = load_deck_from_homecity_xml(self.homecity_xml_path, "Eco Instant Spam")
-        return {
-            "connected": True,
-            "process_attached": False,
-            "snapshot_mode": "verified_pid448",
-            "process_name": "age3y.exe",
-            "pid": 448,
-            "player_name": "dali",
-            "civ": "Russians",
-            "civ_id": 12,
-            "homecity": "St. Petersburg",
-            "homecity_file": "sp_St. Petersburg_homecity.xml",
-            "homecity_xml": "sp_St. Petersburg_homecity.xml",
-            "food": 838.24,
-            "wood": 289.33,
-            "coin": 106.56,
-            "fame": 0.0,
-            "export": 0.0,
-            "food_per_sec": 3.12,
-            "wood_per_sec": 0.50,
-            "coin_per_sec": 0.60,
-            "pop": 5,
-            "pop_cap": 10,
-            "pop_headroom": 5,
-            "villagers": 5,
-            "shipments_available": 1,
-            "total_shipments_earned": 1,
-            "next_shipment_number": 2,
-            "xp_current": 321.0,
-            "xp_needed_next": 324,
-            "xp_needed": 324,
-            "xp_next_threshold": 645.0,
-            "xp_prev_threshold": 300.0,
-            "xp_progress_pct": 6.1,
-            "age": 1,
-            "game_time_ms": 162086,
-            "game_time_sec": 162.086,
-            "deck_name": "Eco Instant Spam",
-            "cards": cards,
-            "xp_address_info": {
-                "bplayer_addr": "0x1426A800",
-                "bhomecity_addr": "0x12C3A000",
-                "bdeck_addr": "0x1A37F5E8",
-                "res_array_ptr": "0x0FE9A080",
-                "xp_encrypted_addr": "0x0FE9A094",
-                "xor_table_addr": "0x00C6DF14",
-                "xp_xor_key": "0xF9ABC42A",
-                "formula": (
-                    "xp_current = float32(uint32(0x0FE9A094) ^ 0xF9ABC42A) = 321.0; "
-                    "xp_needed_next = round(float32(0x1426AC80 [645.0]) - 321.0) = 324"
-                ),
-            },
-        }
-
-    # Aliases for full compatibility with app_ui.py and external callers
     get_telemetry = read_snapshot
     read = read_snapshot
     poll = read_snapshot
@@ -831,7 +951,6 @@ class TelemetryReader:
     get_state = read_snapshot
 
 
-# Module-level singleton & convenience functions
 _default_reader: Optional[TelemetryReader] = None
 
 
@@ -850,7 +969,6 @@ get_telemetry = read_snapshot
 read_telemetry = read_snapshot
 get_snapshot = read_snapshot
 
-# Class aliases
 AoE3Telemetry = TelemetryReader
 MemoryReader = TelemetryReader
 
@@ -860,7 +978,6 @@ def push_telemetry_snapshot(
     server_urls: List[str],
     timeout: float = 1.0,
 ) -> bool:
-    """POST JSON telemetry snapshot to local server and optional remote URL."""
     payload = json.dumps(snapshot).encode("utf-8")
     ok_any = False
     for base_url in server_urls:
@@ -875,7 +992,7 @@ def push_telemetry_snapshot(
                 data=payload,
                 headers={
                     "Content-Type": "application/json",
-                    "User-Agent": "AoE3Assistant-Telemetry/1.0.0",
+                    "User-Agent": "AoE3Assistant-Telemetry/1.1.0",
                 },
                 method="POST",
             )
@@ -923,19 +1040,20 @@ def main() -> None:
         print(json.dumps(snap, indent=2))
         return
 
-    print(f"[telemetry.py] Starting 1 Hz Read-Only AoE3 Telemetry loop -> {targets}")
+    print(f"[telemetry.py v1.1.0] Starting 1 Hz Read-Only AoE3 Telemetry loop -> {targets}")
     try:
         while True:
             t0 = time.time()
             snap = reader.read_snapshot()
             pushed = push_telemetry_snapshot(snap, targets)
-            mode = snap.get("snapshot_mode", "unknown")
+            st = snap.get("match_state", "UNKNOWN")
             print(
-                f"[{mode}] PID={snap.get('pid')} Food={snap.get('food'):.2f} ({snap.get('food_per_sec'):+.2f}/s) "
-                f"Wood={snap.get('wood'):.2f} Coin={snap.get('coin'):.2f} "
+                f"[{st}] PID={snap.get('pid')} State='{snap.get('status_text')}' "
+                f"Food={snap.get('food'):.2f} ({snap.get('food_per_sec'):+.2f}/s) "
+                f"Wood={snap.get('wood'):.2f} Coin={snap.get('coin'):.2f} XP/s={snap.get('xp_per_sec'):+.2f} "
                 f"Pop={snap.get('pop')}/{snap.get('pop_cap')} Vills={snap.get('villagers')} "
-                f"Ships={snap.get('shipments_available')} XP={snap.get('xp_current'):.1f}/{snap.get('xp_next_threshold'):.1f} "
-                f"(Needed={snap.get('xp_needed_next')}) NextCard={snap.get('next_recommended_card')} Push={pushed}"
+                f"Ships={snap.get('shipments_available')} CardsUsed={snap.get('cards_used_count')}/44 "
+                f"NextCard='{snap.get('next_recommended_card')}' Push={pushed}"
             )
             elapsed = time.time() - t0
             time.sleep(max(0.1, args.interval - elapsed))

@@ -1,5 +1,5 @@
 """
-AoE3 Live Telemetry & Russia Coach — Real-Time Backend Server (server.py)
+AoE3 Live Telemetry & Russia Coach — Real-Time Backend Server (server.py) v1.1.0
 Listens on 0.0.0.0:8765 (LAN + localhost + remote/tunnel support).
 
 Endpoints:
@@ -46,10 +46,10 @@ CLOUDFLARED_CANDIDATES = [
 
 GITHUB_REPO = "DALI951/aoe3-assistant"
 DEFAULT_VERSION_MANIFEST = {
-    "version": "1.0.0",
-    "exe_version": "1.0.0",
-    "apk_version": "1.0.0",
-    "tag": "v1.0.0",
+    "version": "1.1.0",
+    "exe_version": "1.1.0",
+    "apk_version": "1.1.0",
+    "tag": "v1.1.0",
     "repo": GITHUB_REPO,
     "repo_url": f"https://github.com/{GITHUB_REPO}",
     "version_json_url": f"https://github.com/{GITHUB_REPO}/releases/latest/download/version.json",
@@ -61,10 +61,11 @@ DEFAULT_VERSION_MANIFEST = {
     "local_setup_url": "/releases/AoE3AssistantSetup.exe",
     "local_apk_url": "/releases/AoE3Assistant.apk",
     "release_notes": (
-        "v1.0.0 - Live AoE3 Telemetry (exact 324 XP, resource gather rates, 44-card Eco Instant Spam tracker), "
-        "Russia Coach HUD (F8 toggle + TTS), Web Dashboard, and Android Companion APK with self-updater."
+        "v1.1.0 - Zero defaults when game not running, accurate Match State (PLAYING / PAUSED / WAITING_FOR_MATCH / GAME_NOT_RUNNING), "
+        "XP/s income rate, accurate used/remaining card count, F12 hotkey, draggable HUD overlay, silent mode (all TTS/sound removed), "
+        "and clean uncramped Android layout."
     ),
-    "published_at": "2026-11-19T21:18:00Z",
+    "published_at": "2026-11-19T22:00:00Z",
 }
 
 # Exact 44-card "Eco Instant Spam" deck from sp_St. Petersburg_homecity.xml (11 cards per Age I-IV)
@@ -303,6 +304,7 @@ CARD_BY_TECH: Dict[str, Dict[str, Any]] = {c["tech"].lower(): c for c in ECO_INS
 CARD_BY_NAME: Dict[str, Dict[str, Any]] = {c["name"].lower(): c for c in ECO_INSTANT_SPAM_CARDS}
 
 AGE_NAMES = {
+    0: ("-", "No Match Active"),
     1: ("I", "Discovery Age"),
     2: ("II", "Colonial Age"),
     3: ("III", "Fortress Age"),
@@ -340,103 +342,69 @@ def format_game_time(seconds: float) -> str:
     return f"{mins:02d}:{rem:02d}"
 
 
-def build_initial_state(port: int = 8765) -> Dict[str, Any]:
+def build_zero_state(port: int = 8765, status_text: str = "Game not running — run a game (waiting for match...)") -> Dict[str, Any]:
     """
-    Build initial live state matching the active paused age3y.exe (PID 448) session:
-    Player 'dali' (Russians), Food 838.24, Wood 289.33, Coin 106.56, Pop 5/10,
-    Villagers 5, Available Shipments 1, 324 XP needed for Shipment #2 (threshold 645),
-    Deck 'Eco Instant Spam' (44 cards).
+    Build clean zero state when game is NOT running or no match is active.
+    ALL numeric fields are strictly 0!
     """
     lan_ip = get_lan_ip()
-    cards = copy.deepcopy(ECO_INSTANT_SPAM_CARDS)
     now_ts = time.time()
     return {
-        "connected": True,
-        "process_name": "age3y.exe",
-        "pid": 448,
-        "player_name": "dali",
-        "civ": "Russians",
-        "civ_id": 12,
-        "homecity": "St. Petersburg",
-        "homecity_xml": "sp_St. Petersburg_homecity.xml",
-        "food": 838.24,
-        "wood": 289.33,
-        "coin": 106.56,
+        "connected": False,
+        "game_running": False,
+        "in_match": False,
+        "is_playing": False,
+        "is_paused": False,
+        "match_state": "GAME_NOT_RUNNING",
+        "status_text": status_text,
+        "process_name": None,
+        "pid": None,
+        "player_name": "",
+        "civ": "",
+        "civ_id": 0,
+        "homecity": "",
+        "homecity_xml": "",
+        "food": 0.0,
+        "wood": 0.0,
+        "coin": 0.0,
         "food_per_sec": 0.0,
         "wood_per_sec": 0.0,
         "coin_per_sec": 0.0,
-        "pop": 5,
-        "pop_cap": 10,
-        "pop_headroom": 5,
-        "villagers": 5,
-        "shipments_available": 1,
-        "xp_current": 321.0,
-        "xp_needed_next": 324,
-        "xp_next_threshold": 645.0,
-        "xp_prev_threshold": 300.0,
-        "xp_progress_pct": 6.1,
-        "next_shipment_number": 2,
-        "age": 1,
-        "age_roman": "I",
-        "age_name": "Discovery Age",
-        "game_time_sec": 162.086,
-        "game_time_formatted": "02:42",
+        "xp_per_sec": 0.0,
+        "pop": 0,
+        "pop_cap": 0,
+        "pop_headroom": 0,
+        "villagers": 0,
+        "shipments_available": 0,
+        "xp_current": 0.0,
+        "xp_needed_next": 0,
+        "xp_next_threshold": 0.0,
+        "xp_prev_threshold": 0.0,
+        "xp_progress_pct": 0.0,
+        "next_shipment_number": 0,
+        "age": 0,
+        "age_roman": "-",
+        "age_name": "No Match Active",
+        "game_time_sec": 0.0,
+        "game_time_formatted": "00:00",
         "in_war": False,
-        "war_status": "PEACE — Eco & Age-Up Phase",
+        "war_status": "NO MATCH ACTIVE",
         "unit_loss_count": 0,
-        "tc_batch_timer_sec": 18.0,
+        "tc_batch_timer_sec": 0.0,
         "tc_batch_cycle_sec": 53.0,
         "tc_idle_warning": False,
-        "tc_status": "838 Food banked (>= 800F): Click Age Up to Colonial Age, or queue 3 Settlers (270F)!",
-        "deck_name": "Eco Instant Spam",
-        "deck_card_count": 44,
-        "cards": cards,
-        "recommended_card": {
-            "dbid": 3440,
-            "tech": "HCXPDistributivism",
-            "name": "Distributivism",
-            "short_desc": "+1.25 Wood/s Trickle",
-            "age": 1,
-            "reason": "1 Shipment ready in Age I! Send Distributivism (+1.25 Wood/s passive trickle) or Economic Theory (+10% all gather).",
-        },
-        "coach_advice": (
-            "1 SHIPMENT READY + 838 FOOD BANKED! Click Age Up to Colonial Age (800 Food) right now, "
-            "and send Distributivism (+1.25 Wood/s trickle) or Economic Theory (+10% gather)!"
-        ),
-        "alerts": [
-            {
-                "level": "urgent",
-                "type": "shipment",
-                "title": "1 Shipment Available (324 XP to Shipment #2)",
-                "message": "Send Distributivism (+1.25 Wood/s trickle) or Economic Theory (+10% all gather rates).",
-            },
-            {
-                "level": "warning",
-                "type": "macro",
-                "title": "838 Food Banked — Ready to Age Up (800F)!",
-                "message": "You have 838.24 Food in Discovery Age. Start Colonial Age politician or queue a 3-Settler batch (270F).",
-            },
-            {
-                "level": "info",
-                "type": "population",
-                "title": "Population 5/10 (5 Villagers)",
-                "message": "5 pop headroom remaining. Build 1 House (100W) before Colonial Age finishes.",
-            },
-        ],
-        "history": [
-            {
-                "t": round(162.086 - (19 - i), 1),
-                "food": 838.24,
-                "wood": 289.33,
-                "coin": 106.56,
-                "food_per_sec": 0.0,
-                "wood_per_sec": 0.0,
-                "coin_per_sec": 0.0,
-                "pop": 5,
-                "villagers": 5,
-            }
-            for i in range(20)
-        ],
+        "tc_status": status_text,
+        "deck_name": "",
+        "deck_card_count": 0,
+        "cards_used_count": 0,
+        "cards_remaining_count": 0,
+        "cards_used_names": [],
+        "cards_unused_names": [],
+        "cards": [],
+        "recommended_card": None,
+        "coach_advice": status_text,
+        "alerts": [],
+        "history": [],
         "server_info": {
             "lan_ip": lan_ip,
             "port": port,
@@ -445,7 +413,8 @@ def build_initial_state(port: int = 8765) -> Dict[str, Any]:
             "remote_domain": "https://modali.powerpme.com",
             "remote_vps_ip": "212.227.215.235",
             "tunnel_url": None,
-            "version": "1.0.0",
+            "version": "1.1.0",
+            "post_count": 0,
         },
         "updated_at": now_ts,
         "updated_iso": datetime.now(timezone.utc).isoformat(),
@@ -458,8 +427,8 @@ class TelemetryStore:
     def __init__(self, port: int = 8765):
         self.port = port
         self.lan_ip = get_lan_ip()
-        self.state: Dict[str, Any] = build_initial_state(port=port)
-        self.history: deque = deque(self.state["history"], maxlen=60)
+        self.state: Dict[str, Any] = build_zero_state(port=port)
+        self.history: deque = deque(maxlen=60)
         self.ws_clients: Set[web.WebSocketResponse] = set()
         self.sse_queues: Set[asyncio.Queue] = set()
         self.last_post_ts: float = 0.0
@@ -468,16 +437,40 @@ class TelemetryStore:
         self.tunnel_proc: Optional[subprocess.Popen] = None
         self._lock = threading.Lock()
 
+    def reset_to_not_running(self, status_text: str = "Game not running — run a game (waiting for match...)") -> Dict[str, Any]:
+        """Reset state cleanly to zero defaults when game exits or telemetry times out."""
+        with self._lock:
+            s = build_zero_state(port=self.port, status_text=status_text)
+            s["server_info"]["tunnel_url"] = self.tunnel_url
+            s["server_info"]["post_count"] = self.post_count
+            self.state = s
+            self.history.clear()
+            return copy.deepcopy(self.state)
+
+    def check_timeout(self) -> bool:
+        """Return True if active telemetry has timed out (>5s) and was reset to GAME_NOT_RUNNING."""
+        with self._lock:
+            if self.last_post_ts > 0 and (time.time() - self.last_post_ts > 5.0):
+                if self.state.get("game_running") or self.state.get("in_match"):
+                    self.state = build_zero_state(
+                        port=self.port,
+                        status_text="Game not running — run a game (waiting for match...)",
+                    )
+                    self.state["server_info"]["tunnel_url"] = self.tunnel_url
+                    self.state["server_info"]["post_count"] = self.post_count
+                    self.history.clear()
+                    return True
+        return False
+
     def _normalize_cards(
         self,
         incoming_cards: Optional[List[Any]],
         age: int,
         in_war: bool,
         recommended_hint: Optional[Any] = None,
-    ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    ) -> Tuple[List[Dict[str, Any]], Optional[Dict[str, Any]], int, int, List[str], List[str]]:
         """
-        Normalize incoming 44 cards from telemetry.py while preserving exact Eco Instant Spam
-        metadata (Age I-IV, slot 1..11, dbid, tech, name, short_desc, category, used, recommended).
+        Normalize 44 cards while computing accurate used vs. remaining card counts.
         """
         base_cards = copy.deepcopy(ECO_INSTANT_SPAM_CARDS)
         used_by_index: Dict[int, bool] = {}
@@ -536,6 +529,9 @@ class TelemetryStore:
                             rec_tech_or_name = str(item.get("name"))
 
         # Apply used flags to the 44 canonical Eco Instant Spam cards
+        cards_used_names = []
+        cards_unused_names = []
+        used_count = 0
         for c in base_cards:
             idx = c["index"]
             dbid = c["dbid"]
@@ -548,7 +544,15 @@ class TelemetryStore:
                 c["used"] = used_by_index[idx]
             c["recommended"] = False
 
-        # Choose recommended card
+            if c["used"]:
+                used_count += 1
+                cards_used_names.append(c["name"])
+            else:
+                cards_unused_names.append(c["name"])
+
+        remaining_count = len(base_cards) - used_count
+
+        # Choose recommended card ONLY from UNUSED cards
         chosen_rec: Optional[Dict[str, Any]] = None
         if rec_dbid is not None and rec_dbid in CARD_BY_DBID:
             for c in base_cards:
@@ -563,7 +567,6 @@ class TelemetryStore:
                     break
 
         if chosen_rec is None:
-            # Automatically pick highest priority available card in <= current age
             eff_age = max(1, min(4, int(age or 1)))
             candidates = [c for c in base_cards if not c["used"] and c["age"] <= eff_age]
             if not candidates:
@@ -588,19 +591,14 @@ class TelemetryStore:
                 "reason": f"Best available Age {AGE_NAMES.get(chosen_rec['age'], ('I', ''))[0]} card: {chosen_rec['name']} ({chosen_rec['short_desc']})",
             }
         else:
-            rec_summary = {
-                "dbid": 3440,
-                "tech": "HCXPDistributivism",
-                "name": "Distributivism",
-                "short_desc": "+1.25 Wood/s Trickle",
-                "age": 1,
-                "category": "eco",
-                "reason": "Eco Instant Spam opener",
-            }
+            rec_summary = None
 
-        return base_cards, rec_summary
+        return base_cards, rec_summary, used_count, remaining_count, cards_used_names, cards_unused_names
 
     def _normalize_alerts(self, incoming_alerts: Any, state: Dict[str, Any]) -> List[Dict[str, str]]:
+        if not state.get("in_match"):
+            return []
+
         if isinstance(incoming_alerts, list) and len(incoming_alerts) > 0:
             normalized = []
             for a in incoming_alerts:
@@ -623,7 +621,6 @@ class TelemetryStore:
             if normalized:
                 return normalized
 
-        # Generate smart default alerts from telemetry state
         alerts: List[Dict[str, str]] = []
         if state.get("in_war"):
             alerts.append({
@@ -633,14 +630,14 @@ class TelemetryStore:
                 "message": "Pop dropped suddenly! Queue Strelets/Cossack batches from Blockhouse & Stable and call Military Shipment!",
             })
         ships = int(state.get("shipments_available", 0) or 0)
-        xp_need = int(round(float(state.get("xp_needed_next", 324) or 0)))
+        xp_need = int(round(float(state.get("xp_needed_next", 0) or 0)))
         rec = state.get("recommended_card") or {}
-        if ships > 0:
+        if ships > 0 and rec:
             alerts.append({
                 "level": "urgent",
                 "type": "shipment",
                 "title": f"{ships} Shipment{'s' if ships > 1 else ''} Ready! ({xp_need} XP needed for next)",
-                "message": f"Recommended next card: {rec.get('name', 'Distributivism')} ({rec.get('short_desc', '+1.25 Wood/s')}).",
+                "message": f"Recommended next card: {rec.get('name', '')} ({rec.get('short_desc', '')}).",
             })
         food = float(state.get("food", 0) or 0)
         age = int(state.get("age", 1) or 1)
@@ -658,9 +655,9 @@ class TelemetryStore:
                 "title": "Town Center 3-Settler Batch Ready (270 Food)!",
                 "message": "Never let Russian TC go idle — queue a 3-Settler batch (270 Food) immediately.",
             })
-        pop = int(state.get("pop", 5) or 0)
-        pop_cap = int(state.get("pop_cap", 10) or 10)
-        if pop_cap - pop <= 5 and pop_cap < 200:
+        pop = int(state.get("pop", 0) or 0)
+        pop_cap = int(state.get("pop_cap", 0) or 0)
+        if pop_cap > 0 and (pop_cap - pop <= 5) and pop_cap < 200:
             alerts.append({
                 "level": "info",
                 "type": "population",
@@ -673,44 +670,95 @@ class TelemetryStore:
         """Merge incoming POST /api/telemetry JSON payload into live state."""
         with self._lock:
             now_ts = time.time()
-            prev = self.state
-            s = copy.deepcopy(prev)
+            self.last_post_ts = now_ts
+            self.post_count += 1
 
-            # Copy any custom top-level fields from telemetry.py / coach.py
-            for k, v in payload.items():
-                if k not in ("cards", "alerts", "history", "server_info") and v is not None:
-                    s[k] = v
+            # Determine game running and match status
+            game_running = bool(payload.get("game_running", True))
+            in_match = bool(payload.get("in_match", False))
 
-            # Canonical numeric fields
-            s["food"] = round(float(payload.get("food", prev.get("food", 838.24)) or 0.0), 2)
-            s["wood"] = round(float(payload.get("wood", prev.get("wood", 289.33)) or 0.0), 2)
-            s["coin"] = round(float(payload.get("coin", prev.get("coin", 106.56)) or 0.0), 2)
+            # Case 1: Game not running
+            if not game_running:
+                status_txt = str(payload.get("status_text") or "Game not running — run a game (waiting for match...)")
+                s = build_zero_state(port=self.port, status_text=status_txt)
+                s["server_info"]["tunnel_url"] = self.tunnel_url
+                s["server_info"]["post_count"] = self.post_count
+                self.state = s
+                self.history.clear()
+                return copy.deepcopy(self.state)
 
-            s["food_per_sec"] = round(float(payload.get("food_per_sec", prev.get("food_per_sec", 0.0)) or 0.0), 2)
-            s["wood_per_sec"] = round(float(payload.get("wood_per_sec", prev.get("wood_per_sec", 0.0)) or 0.0), 2)
-            s["coin_per_sec"] = round(float(payload.get("coin_per_sec", prev.get("coin_per_sec", 0.0)) or 0.0), 2)
+            # Case 2: Game running, but no active match yet
+            if not in_match:
+                status_txt = str(payload.get("status_text") or "AoE3 running — waiting for a match to start...")
+                s = build_zero_state(port=self.port, status_text=status_txt)
+                s["connected"] = True
+                s["game_running"] = True
+                s["in_match"] = False
+                s["is_playing"] = False
+                s["is_paused"] = False
+                s["match_state"] = "WAITING_FOR_MATCH"
+                s["status_text"] = status_txt
+                s["process_name"] = payload.get("process_name", "age3y.exe")
+                s["pid"] = payload.get("pid")
+                s["coach_advice"] = status_txt
+                s["tc_status"] = "Waiting for match..."
+                s["server_info"]["tunnel_url"] = self.tunnel_url
+                s["server_info"]["post_count"] = self.post_count
+                self.state = s
+                self.history.clear()
+                return copy.deepcopy(self.state)
 
-            s["pop"] = int(payload.get("pop", prev.get("pop", 5)) or 0)
-            s["pop_cap"] = int(payload.get("pop_cap", prev.get("pop_cap", 10)) or 10)
+            # Case 3: In active match!
+            s = copy.deepcopy(self.state)
+            s["connected"] = True
+            s["game_running"] = True
+            s["in_match"] = True
+            s["process_name"] = payload.get("process_name", "age3y.exe")
+            s["pid"] = payload.get("pid")
+
+            # Match playing / paused state
+            is_playing = bool(payload.get("is_playing", True))
+            is_paused = bool(payload.get("is_paused", False))
+            match_state = str(payload.get("match_state") or ("PAUSED" if is_paused else "PLAYING")).upper()
+            if match_state not in ("PLAYING", "PAUSED"):
+                match_state = "PAUSED" if is_paused else "PLAYING"
+            s["is_playing"] = (match_state == "PLAYING")
+            s["is_paused"] = (match_state == "PAUSED")
+            s["match_state"] = match_state
+            s["status_text"] = payload.get("status_text") or f"In Match — {match_state.capitalize()}"
+
+            # Copy player / civ identity
+            s["player_name"] = str(payload.get("player_name") or s.get("player_name") or "dali")
+            s["civ"] = str(payload.get("civ") or s.get("civ") or "Russians")
+            s["civ_id"] = int(payload.get("civ_id", 12) or 12)
+            s["homecity"] = str(payload.get("homecity") or s.get("homecity") or "St. Petersburg")
+            s["homecity_xml"] = str(payload.get("homecity_xml") or s.get("homecity_xml") or "sp_St. Petersburg_homecity.xml")
+
+            # Resources & income rates (including xp_per_sec!)
+            s["food"] = round(float(payload.get("food", 0.0) or 0.0), 2)
+            s["wood"] = round(float(payload.get("wood", 0.0) or 0.0), 2)
+            s["coin"] = round(float(payload.get("coin", 0.0) or 0.0), 2)
+
+            s["food_per_sec"] = round(float(payload.get("food_per_sec", 0.0) or 0.0), 2)
+            s["wood_per_sec"] = round(float(payload.get("wood_per_sec", 0.0) or 0.0), 2)
+            s["coin_per_sec"] = round(float(payload.get("coin_per_sec", 0.0) or 0.0), 2)
+            s["xp_per_sec"] = round(float(payload.get("xp_per_sec", 0.0) or 0.0), 2)
+
+            s["pop"] = int(payload.get("pop", 0) or 0)
+            s["pop_cap"] = int(payload.get("pop_cap", 0) or 0)
             s["pop_headroom"] = max(0, s["pop_cap"] - s["pop"])
-            s["villagers"] = int(payload.get("villagers", prev.get("villagers", 5)) or 0)
+            s["villagers"] = int(payload.get("villagers", 0) or 0)
 
-            s["shipments_available"] = int(
-                payload.get("shipments_available", prev.get("shipments_available", 1)) or 0
-            )
-            s["xp_next_threshold"] = round(
-                float(payload.get("xp_next_threshold", prev.get("xp_next_threshold", 645.0)) or 645.0), 1
-            )
-            s["xp_prev_threshold"] = round(
-                float(payload.get("xp_prev_threshold", prev.get("xp_prev_threshold", 300.0)) or 300.0), 1
-            )
+            s["shipments_available"] = int(payload.get("shipments_available", 0) or 0)
+            s["xp_next_threshold"] = round(float(payload.get("xp_next_threshold", 0.0) or 0.0), 1)
+            s["xp_prev_threshold"] = round(float(payload.get("xp_prev_threshold", 0.0) or 0.0), 1)
 
             if "xp_needed_next" in payload and payload["xp_needed_next"] is not None:
                 xp_needed = float(payload["xp_needed_next"])
-            elif "xp_current" in payload and payload["xp_current"] is not None:
+            elif "xp_current" in payload and payload["xp_current"] is not None and s["xp_next_threshold"] > 0:
                 xp_needed = max(0.0, s["xp_next_threshold"] - float(payload["xp_current"]))
             else:
-                xp_needed = float(prev.get("xp_needed_next", 324))
+                xp_needed = float(s.get("xp_needed_next", 0))
 
             s["xp_needed_next"] = int(round(xp_needed))
             if "xp_current" in payload and payload["xp_current"] is not None:
@@ -719,11 +767,14 @@ class TelemetryStore:
                 s["xp_current"] = round(max(0.0, s["xp_next_threshold"] - xp_needed), 1)
 
             span = max(1.0, s["xp_next_threshold"] - s["xp_prev_threshold"])
-            gained_in_tier = max(0.0, span - xp_needed)
-            s["xp_progress_pct"] = round(min(100.0, max(0.0, (gained_in_tier / span) * 100.0)), 1)
+            if s["xp_next_threshold"] > 0:
+                gained_in_tier = max(0.0, span - xp_needed)
+                s["xp_progress_pct"] = round(min(100.0, max(0.0, (gained_in_tier / span) * 100.0)), 1)
+            else:
+                s["xp_progress_pct"] = 0.0
 
-            # Parse age (accepts int 1..5 or string "Age I", "II", etc.)
-            raw_age = payload.get("age", prev.get("age", 1))
+            # Age
+            raw_age = payload.get("age", 1)
             age_int = 1
             if isinstance(raw_age, (int, float)):
                 age_int = max(1, min(5, int(raw_age)))
@@ -742,56 +793,65 @@ class TelemetryStore:
             s["age"] = age_int
             s["age_roman"], s["age_name"] = AGE_NAMES.get(age_int, ("I", "Discovery Age"))
 
-            s["game_time_sec"] = round(
-                float(payload.get("game_time_sec", prev.get("game_time_sec", 162.086)) or 0.0), 3
-            )
+            s["game_time_sec"] = round(float(payload.get("game_time_sec", 0.0) or 0.0), 3)
             s["game_time_formatted"] = format_game_time(s["game_time_sec"])
-            s["in_war"] = bool(payload.get("in_war", prev.get("in_war", False)))
+            s["in_war"] = bool(payload.get("in_war", False))
             s["war_status"] = (
-                "ACTIVE WAR — Combat / Unit Loss Detected!"
+                f"[{s['match_state']}] ACTIVE WAR — Combat / Unit Loss Detected!"
                 if s["in_war"]
-                else "PEACE — Macro & Settler Batch Phase"
+                else f"[{s['match_state']}] PEACE — Macro & Settler Batch Phase"
             )
 
-            s["deck_name"] = str(payload.get("deck_name") or prev.get("deck_name") or "Eco Instant Spam")
+            s["deck_name"] = str(payload.get("deck_name") or "Eco Instant Spam")
 
             rec_hint = (
                 payload.get("recommended_card")
                 or payload.get("next_recommended_card")
                 or payload.get("recommended")
             )
-            cards, rec_summary = self._normalize_cards(
-                payload.get("cards", prev.get("cards")),
+            cards, rec_summary, used_count, remaining_count, used_names, unused_names = self._normalize_cards(
+                payload.get("cards"),
                 age=s["age"],
                 in_war=s["in_war"],
                 recommended_hint=rec_hint,
             )
             s["cards"] = cards
             s["deck_card_count"] = len(cards)
+            s["cards_used_count"] = used_count
+            s["cards_remaining_count"] = remaining_count
+            s["cards_used_names"] = used_names
+            s["cards_unused_names"] = unused_names
             s["recommended_card"] = rec_summary
 
+            # Coach advice
+            state_prefix = f"[{s['match_state']}] "
             if payload.get("coach_advice"):
-                s["coach_advice"] = str(payload["coach_advice"])
+                raw_advice = str(payload["coach_advice"])
+                if not raw_advice.startswith("["):
+                    s["coach_advice"] = state_prefix + raw_advice
+                else:
+                    s["coach_advice"] = raw_advice
             else:
+                card_name = rec_summary['name'] if rec_summary else 'a card'
                 if s["in_war"]:
                     s["coach_advice"] = (
-                        f"WAR ALERT! Queue Strelets/Cossacks immediately and send {rec_summary['name']} "
-                        f"({rec_summary['short_desc']})."
+                        f"{state_prefix}WAR ALERT! Queue Strelets/Cossacks immediately and send {card_name}. "
+                        f"(Cards Used: {used_count}/44)"
                     )
                 elif s["shipments_available"] > 0:
                     s["coach_advice"] = (
-                        f"{s['shipments_available']} Shipment ready ({s['xp_needed_next']} XP to next)! "
-                        f"Send {rec_summary['name']} ({rec_summary['short_desc']})."
+                        f"{state_prefix}{s['shipments_available']} Shipment ready ({s['xp_needed_next']} XP to next)! "
+                        f"Send {card_name}. (Cards Used: {used_count}/44, {remaining_count} remaining)"
                     )
                 else:
                     s["coach_advice"] = (
-                        f"Keep Russian TC producing 3-Settler batches (270F). "
-                        f"{s['xp_needed_next']} XP needed for next shipment ({rec_summary['name']})."
+                        f"{state_prefix}Keep Russian TC producing 3-Settler batches (270F). "
+                        f"{s['xp_needed_next']} XP needed for next shipment. (Cards Used: {used_count}/44)"
                     )
 
             s["alerts"] = self._normalize_alerts(payload.get("alerts"), s)
 
-            # Append sparkline sample
+            # Sparkline history
             pt = {
                 "t": round(s["game_time_sec"], 1),
                 "ts": round(now_ts, 1),
@@ -801,6 +861,7 @@ class TelemetryStore:
                 "food_per_sec": s["food_per_sec"],
                 "wood_per_sec": s["wood_per_sec"],
                 "coin_per_sec": s["coin_per_sec"],
+                "xp_per_sec": s["xp_per_sec"],
                 "pop": s["pop"],
                 "villagers": s["villagers"],
             }
@@ -815,15 +876,13 @@ class TelemetryStore:
                 "remote_domain": "https://modali.powerpme.com",
                 "remote_vps_ip": "212.227.215.235",
                 "tunnel_url": self.tunnel_url,
-                "version": "1.0.0",
-                "post_count": self.post_count + 1,
+                "version": "1.1.0",
+                "post_count": self.post_count,
             }
             s["updated_at"] = now_ts
             s["updated_iso"] = datetime.now(timezone.utc).isoformat()
 
             self.state = s
-            self.last_post_ts = now_ts
-            self.post_count += 1
             return copy.deepcopy(self.state)
 
     def get_snapshot(self) -> Dict[str, Any]:
@@ -882,7 +941,6 @@ def build_version_manifest(request: Optional[web.Request] = None, store: Optiona
             except Exception:
                 pass
 
-    # Determine request base URL for local mirror URLs
     lan_ip = store.lan_ip if store else get_lan_ip()
     port = store.port if store else 8765
     base_url = f"http://{lan_ip}:{port}"
@@ -971,7 +1029,7 @@ async def handle_index(request: web.Request) -> web.Response:
         with open(index_path, "r", encoding="utf-8") as f:
             html = f.read()
         return web.Response(text=html, content_type="text/html", charset="utf-8")
-    return web.Response(text="AoE3 Russia Coach Server Running", content_type="text/plain")
+    return web.Response(text="AoE3 Russia Coach Server v1.1.0 Running", content_type="text/plain")
 
 
 async def handle_post_telemetry(request: web.Request) -> web.Response:
@@ -987,6 +1045,7 @@ async def handle_post_telemetry(request: web.Request) -> web.Response:
     await broadcast_state(store, snapshot)
     return web.json_response({
         "status": "ok",
+        "match_state": snapshot.get("match_state", "GAME_NOT_RUNNING"),
         "updated_at": snapshot["updated_at"],
         "post_count": store.post_count,
         "ws_clients": len(store.ws_clients),
@@ -996,6 +1055,8 @@ async def handle_post_telemetry(request: web.Request) -> web.Response:
 
 async def handle_get_state(request: web.Request) -> web.Response:
     store: TelemetryStore = request.app["store"]
+    if store.check_timeout():
+        await broadcast_state(store)
     return web.json_response(store.get_snapshot())
 
 
@@ -1013,7 +1074,6 @@ async def handle_stream(request: web.Request) -> web.StreamResponse:
         await ws.prepare(request)
         store.ws_clients.add(ws)
         try:
-            # Send initial snapshot right away
             await ws.send_str(json.dumps(store.get_snapshot(), ensure_ascii=False))
             async for msg in ws:
                 if msg.type == WSMsgType.TEXT:
@@ -1033,7 +1093,6 @@ async def handle_stream(request: web.Request) -> web.StreamResponse:
             store.ws_clients.discard(ws)
         return ws
 
-    # Server-Sent Events (SSE) stream
     resp = web.StreamResponse(
         status=200,
         reason="OK",
@@ -1055,7 +1114,7 @@ async def handle_stream(request: web.Request) -> web.StreamResponse:
         while True:
             payload_str = await q.get()
             await resp.write(f"data: {payload_str}\n\n".encode("utf-8"))
-    except ( asyncio.CancelledError, ConnectionResetError, Exception ):
+    except (asyncio.CancelledError, ConnectionResetError, Exception):
         pass
     finally:
         store.sse_queues.discard(q)
@@ -1075,7 +1134,6 @@ async def handle_release_download(request: web.Request) -> web.StreamResponse:
 
     path = resolve_release_file(filename)
     if not path or not os.path.isfile(path):
-        # If binary isn't built locally yet, redirect cleanly to the GitHub Releases URL
         manifest = build_version_manifest(request=request, store=request.app["store"])
         if filename == "AoE3Assistant.exe":
             raise web.HTTPFound(manifest["exe_url"])
@@ -1130,7 +1188,6 @@ async def handle_network_info(request: web.Request) -> web.Response:
 
 
 async def handle_start_tunnel(request: web.Request) -> web.Response:
-    """Start an optional Cloudflare Quick Tunnel using local cloudflared.exe if requested."""
     store: TelemetryStore = request.app["store"]
     if store.tunnel_url:
         return web.json_response({"status": "already_running", "tunnel_url": store.tunnel_url})
@@ -1175,12 +1232,13 @@ async def handle_start_tunnel(request: web.Request) -> web.Response:
 
 
 async def heartbeat_broadcaster(app: web.Application) -> None:
-    """1 Hz background loop broadcasting live state to all connected WebSocket and SSE clients."""
+    """1 Hz background loop broadcasting live state and enforcing 5s telemetry timeout."""
     store: TelemetryStore = app["store"]
     try:
         while True:
             await asyncio.sleep(1.0)
-            if store.ws_clients or store.sse_queues:
+            timed_out = store.check_timeout()
+            if timed_out or store.ws_clients or store.sse_queues:
                 await broadcast_state(store)
     except asyncio.CancelledError:
         pass
@@ -1234,14 +1292,14 @@ def create_app(port: int = 8765) -> web.Application:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="AoE3 Live Telemetry & Russia Coach Server")
+    parser = argparse.ArgumentParser(description="AoE3 Live Telemetry & Russia Coach Server v1.1.0")
     parser.add_argument("--host", default=os.environ.get("AOE3_SERVER_HOST", "0.0.0.0"))
     parser.add_argument("--port", type=int, default=int(os.environ.get("AOE3_SERVER_PORT", "8765")))
     args = parser.parse_args()
 
     lan_ip = get_lan_ip()
     print("=" * 72, flush=True)
-    print(f" AoE3 Live Telemetry & Russia Coach Server v1.0.0", flush=True)
+    print(f" AoE3 Live Telemetry & Russia Coach Server v1.1.0", flush=True)
     print(f" Listening on:   http://{args.host}:{args.port}", flush=True)
     print(f" Local URL:      http://127.0.0.1:{args.port}", flush=True)
     print(f" LAN URL:        http://{lan_ip}:{args.port}", flush=True)

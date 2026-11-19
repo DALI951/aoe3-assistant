@@ -1,8 +1,8 @@
 {
-  "version": "1.0.0",
-  "exe_version": "1.0.0",
-  "apk_version": "1.0.0",
-  "tag": "v1.0.0",
+  "version": "1.1.0",
+  "exe_version": "1.1.0",
+  "apk_version": "1.1.0",
+  "tag": "v1.1.0",
   "repo": "DALI951/aoe3-assistant",
   "repo_url": "https://github.com/DALI951/aoe3-assistant",
   "version_json_url": "https://github.com/DALI951/aoe3-assistant/releases/latest/download/version.json",
@@ -13,6 +13,6 @@
   "local_exe_url": "/releases/AoE3Assistant.exe",
   "local_setup_url": "/releases/AoE3AssistantSetup.exe",
   "local_apk_url": "/releases/AoE3Assistant.apk",
-  "release_notes": "v1.0.0 - Live AoE3 Telemetry (exact 324 XP, resource gather rates, 44-card Eco Instant Spam tracker), Russia Coach HUD (F8 toggle + TTS), Web Dashboard, and Android Companion APK with self-updater.",
-  "published_at": "2026-11-19T21:18:00Z"
+  "release_notes": "v1.1.0 - Zero defaults when game not running, accurate Match State (PLAYING / PAUSED / WAITING_FOR_MATCH / GAME_NOT_RUNNING), XP/s income rate, accurate used/remaining card count, F12 hotkey, draggable HUD overlay, silent mode (all TTS/sound removed), and clean uncramped Android layout.",
+  "published_at": "2026-11-19T22:00:00Z"
 }

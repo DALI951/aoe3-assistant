@@ -12,7 +12,6 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
-import android.speech.tts.TextToSpeech;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.DownloadListener;
@@ -38,14 +37,11 @@ import java.util.concurrent.Executors;
 public class MainActivity extends Activity {
     private static final String PREFS_NAME = "AoE3CoachPrefs";
     private static final String KEY_SERVER_URL = "server_url";
-    private static final String KEY_TTS_ENABLED = "tts_enabled";
-    private static final String APP_VERSION = "1.0.0";
-    private static final int APP_VERSION_CODE = 1;
+    private static final String APP_VERSION = "1.1.0";
+    private static final int APP_VERSION_CODE = 2;
     private static final String DEFAULT_SERVER_URL = "http://192.168.1.154:8765";
 
     private WebView webView;
-    private TextToSpeech tts;
-    private boolean ttsReady = false;
     private ExecutorService httpExecutor;
 
     @Override
@@ -57,29 +53,14 @@ public class MainActivity extends Activity {
         if (window != null) {
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
             window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
-            window.setStatusBarColor(Color.parseColor("#0B0F17"));
-            window.setNavigationBarColor(Color.parseColor("#0B0F17"));
+            window.setStatusBarColor(Color.parseColor("#080D14"));
+            window.setNavigationBarColor(Color.parseColor("#080D14"));
         }
 
         httpExecutor = Executors.newCachedThreadPool();
 
-        try {
-            tts = new TextToSpeech(getApplicationContext(), new TextToSpeech.OnInitListener() {
-                @Override
-                public void onInit(int status) {
-                    if (status == TextToSpeech.SUCCESS && tts != null) {
-                        int res = tts.setLanguage(Locale.US);
-                        ttsReady = (res != TextToSpeech.LANG_MISSING_DATA && res != TextToSpeech.LANG_NOT_SUPPORTED);
-                        tts.setSpeechRate(1.05f);
-                    }
-                }
-            });
-        } catch (Throwable ignored) {
-            ttsReady = false;
-        }
-
         webView = new WebView(this);
-        webView.setBackgroundColor(Color.parseColor("#0B0F17"));
+        webView.setBackgroundColor(Color.parseColor("#080D14"));
 
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -207,31 +188,17 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public boolean getTtsEnabled() {
-            SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-            return prefs.getBoolean(KEY_TTS_ENABLED, true);
+            return false;
         }
 
         @JavascriptInterface
         public void setTtsEnabled(boolean enabled) {
-            SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-            prefs.edit().putBoolean(KEY_TTS_ENABLED, enabled).apply();
-            if (!enabled && tts != null) {
-                try {
-                    tts.stop();
-                } catch (Throwable ignored) {
-                }
-            }
+            // Audio removed by design
         }
 
         @JavascriptInterface
         public void speak(String text) {
-            if (text == null || text.trim().isEmpty()) return;
-            if (tts != null && ttsReady) {
-                try {
-                    tts.speak(text.trim(), TextToSpeech.QUEUE_FLUSH, null, "aoe3_alert_" + System.currentTimeMillis());
-                } catch (Throwable ignored) {
-                }
-            }
+            // Audio removed by design
         }
 
         @JavascriptInterface
@@ -239,7 +206,7 @@ public class MainActivity extends Activity {
             try {
                 Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
                 if (v != null && v.hasVibrator()) {
-                    int ms = Math.max(20, Math.min(durationMs, 1000));
+                    int ms = Math.max(20, Math.min(durationMs, 500));
                     if (Build.VERSION.SDK_INT >= 26) {
                         v.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE));
                     } else {
@@ -300,8 +267,8 @@ public class MainActivity extends Activity {
                         conn = (HttpURLConnection) url.openConnection();
                         conn.setInstanceFollowRedirects(true);
                         conn.setRequestMethod("GET");
-                        conn.setConnectTimeout(3500);
-                        conn.setReadTimeout(4500);
+                        conn.setConnectTimeout(3000);
+                        conn.setReadTimeout(4000);
                         conn.setRequestProperty("Accept", "application/json, text/plain, */*");
                         conn.setRequestProperty("User-Agent", "AoE3Assistant-Android/" + APP_VERSION);
                         status = conn.getResponseCode();
@@ -359,8 +326,8 @@ public class MainActivity extends Activity {
                         conn.setInstanceFollowRedirects(true);
                         conn.setRequestMethod("POST");
                         conn.setDoOutput(true);
-                        conn.setConnectTimeout(3500);
-                        conn.setReadTimeout(4500);
+                        conn.setConnectTimeout(3000);
+                        conn.setReadTimeout(4000);
                         conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
                         conn.setRequestProperty("Accept", "application/json");
                         conn.setRequestProperty("User-Agent", "AoE3Assistant-Android/" + APP_VERSION);
@@ -421,13 +388,6 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
-        if (tts != null) {
-            try {
-                tts.stop();
-                tts.shutdown();
-            } catch (Throwable ignored) {
-            }
-        }
         if (httpExecutor != null) {
             try {
                 httpExecutor.shutdownNow();
