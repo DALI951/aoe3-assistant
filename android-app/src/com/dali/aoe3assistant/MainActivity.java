@@ -37,8 +37,8 @@ import java.util.concurrent.Executors;
 public class MainActivity extends Activity {
     private static final String PREFS_NAME = "AoE3CoachPrefs";
     private static final String KEY_SERVER_URL = "server_url";
-    private static final String APP_VERSION = "1.1.0";
-    private static final int APP_VERSION_CODE = 2;
+    private static final String APP_VERSION = "1.2.0";
+    private static final int APP_VERSION_CODE = 3;
     private static final String DEFAULT_SERVER_URL = "http://192.168.1.154:8765";
 
     private WebView webView;

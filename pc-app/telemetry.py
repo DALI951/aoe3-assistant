@@ -827,32 +827,11 @@ class TelemetryReader:
         if res is None:
             return None
 
-        # Detect Playing vs Paused from game_time_ms progression
-        now_wall = time.time()
-        if self._prev_game_time_ms is not None and self._prev_poll_ts is not None:
-            wall_dt = now_wall - self._prev_poll_ts
-            game_dt_ms = game_time_ms - self._prev_game_time_ms
-            if wall_dt >= 0.2:
-                if game_dt_ms <= 0:
-                    self._paused_consecutive_ticks += 1
-                else:
-                    self._paused_consecutive_ticks = 0
-        else:
-            time.sleep(0.06)
-            t2 = self.read_u32(bp + 0x104) or game_time_ms
-            if t2 > game_time_ms:
-                self._paused_consecutive_ticks = 0
-                game_time_ms = t2
-            else:
-                self._paused_consecutive_ticks = 1
-
-        self._prev_game_time_ms = game_time_ms
-        self._prev_poll_ts = now_wall
-
-        is_paused = (self._paused_consecutive_ticks >= 1)
-        is_playing = not is_paused
-        match_state = "PAUSED" if is_paused else "PLAYING"
-        status_text = "In Match — Paused" if is_paused else "In Match — Playing"
+        # In-match state: Keep match active without flapping or freezing resources
+        is_paused = False
+        is_playing = True
+        match_state = "PLAYING"
+        status_text = "In Match — Active"
 
         food = round(max(0.0, res["food"]), 2)
         wood = round(max(0.0, res["wood"]), 2)

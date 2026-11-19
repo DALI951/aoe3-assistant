@@ -218,10 +218,10 @@ def zipalign_apk(base_res_apk, classes_dex_path, aligned_apk_path):
 
 
 def sign_and_verify_apk(unsigned_apk, signed_apk):
-    """Generates keystore if missing, signs APK with V1+V2+V3 schemes using apksig.jar, and verifies it."""
-    keystore_dir = os.path.join(BUILD_DIR, "keystore")
+    """Signs APK with a permanent release keystore using apksig.jar, and verifies it."""
+    keystore_dir = os.path.join(APP_DIR, "keystore")
     os.makedirs(keystore_dir, exist_ok=True)
-    keystore_path = os.path.join(keystore_dir, "aoe3assistant.p12")
+    keystore_path = os.path.join(keystore_dir, "release.jks")
     ks_pass = "aoe3coach123"
     key_alias = "aoe3coach"
 
@@ -234,7 +234,7 @@ def sign_and_verify_apk(unsigned_apk, signed_apk):
                 "-keystore",
                 keystore_path,
                 "-storetype",
-                "PKCS12",
+                "JKS",
                 "-storepass",
                 ks_pass,
                 "-keypass",
@@ -391,13 +391,13 @@ def main():
             "--java",
             gen_dir,
             "--min-sdk-version",
-            "26",
+            "21",
             "--target-sdk-version",
             "33",
             "--version-code",
-            "2",
+            "3",
             "--version-name",
-            "1.1.0",
+            "1.2.0",
             compiled_res_zip,
         ],
         "Link APK resources, manifest & assets with AAPT2",

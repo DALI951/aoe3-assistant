@@ -46,10 +46,10 @@ CLOUDFLARED_CANDIDATES = [
 
 GITHUB_REPO = "DALI951/aoe3-assistant"
 DEFAULT_VERSION_MANIFEST = {
-    "version": "1.1.0",
-    "exe_version": "1.1.0",
-    "apk_version": "1.1.0",
-    "tag": "v1.1.0",
+    "version": "1.2.0",
+    "exe_version": "1.2.0",
+    "apk_version": "1.2.0",
+    "tag": "v1.2.0",
     "repo": GITHUB_REPO,
     "repo_url": f"https://github.com/{GITHUB_REPO}",
     "version_json_url": f"https://github.com/{GITHUB_REPO}/releases/latest/download/version.json",
@@ -448,9 +448,9 @@ class TelemetryStore:
             return copy.deepcopy(self.state)
 
     def check_timeout(self) -> bool:
-        """Return True if active telemetry has timed out (>5s) and was reset to GAME_NOT_RUNNING."""
+        """Return True if active telemetry has timed out (>20s) and was reset to GAME_NOT_RUNNING."""
         with self._lock:
-            if self.last_post_ts > 0 and (time.time() - self.last_post_ts > 5.0):
+            if self.last_post_ts > 0 and (time.time() - self.last_post_ts > 20.0):
                 if self.state.get("game_running") or self.state.get("in_match"):
                     self.state = build_zero_state(
                         port=self.port,

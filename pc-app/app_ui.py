@@ -38,7 +38,7 @@ import urllib.error
 import urllib.request
 import winreg
 
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 APP_NAME = "AoE3 Live Rates Overlay"
 REG_RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 REG_RUN_VALUE = "AoE3Assistant"
