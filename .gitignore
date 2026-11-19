@@ -1,0 +1,34 @@
+# Python build/cache artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.spec
+build/
+.venv/
+venv/
+env/
+
+# PyInstaller & Temporary build folders
+pc-app/build/
+pc-app/dist/
+installer/build/
+installer/dist/
+
+# Android temporary build outputs (keep source & keystore if non-sensitive debug, ignore temp obj/dex/tools)
+android-app/build/
+android-app/.gradle/
+android-app/tools/
+android-app/cmdline-tools/
+android-app/sdk/
+*.apk.idsig
+
+# Binaries in dist/ and server/releases/ are published via GitHub Releases
+dist/*.exe
+dist/*.apk
+server/releases/*.exe
+server/releases/*.apk
+
+# Logs & OS files
+*.log
+.DS_Store
+Thumbs.db

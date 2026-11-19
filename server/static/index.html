@@ -1,0 +1,1130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>AoE3 Russia Coach • Live Telemetry &amp; Eco Instant Spam Dashboard</title>
+  <style>
+    :root {
+      --bg-deep: #0b0e14;
+      --bg-panel: #131924;
+      --bg-card: #1a2232;
+      --bg-card-hover: #212c40;
+      --border: #2a364f;
+      --gold: #f5b942;
+      --gold-bright: #ffd166;
+      --gold-dim: rgba(245, 185, 66, 0.18);
+      --crimson: #e63946;
+      --crimson-dim: rgba(230, 57, 70, 0.2);
+      --emerald: #10b981;
+      --emerald-dim: rgba(16, 185, 129, 0.18);
+      --food-color: #ef4444;
+      --wood-color: #d97706;
+      --coin-color: #facc15;
+      --xp-color: #38bdf8;
+      --pop-color: #a855f7;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: radial-gradient(circle at top, #172033 0%, var(--bg-deep) 65%);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+      min-height: 100vh;
+      padding: 12px 16px 36px;
+      line-height: 1.4;
+    }
+
+    .container {
+      max-width: 1480px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* TOP BAR */
+    .topbar {
+      background: linear-gradient(135deg, rgba(26, 34, 50, 0.95), rgba(19, 25, 36, 0.95));
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--gold);
+      border-radius: 12px;
+      padding: 12px 16px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .crest {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #991b1b, #dc2626);
+      border: 2px solid var(--gold);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 18px;
+      color: var(--gold-bright);
+      box-shadow: 0 0 12px rgba(245, 185, 66, 0.25);
+    }
+
+    .brand-title h1 {
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: 0.3px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .brand-sub {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .status-pills {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .pill {
+      padding: 5px 11px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .pill.live {
+      background: var(--emerald-dim);
+      border-color: var(--emerald);
+      color: #34d399;
+    }
+
+    .pill.age {
+      background: var(--gold-dim);
+      border-color: var(--gold);
+      color: var(--gold-bright);
+    }
+
+    .pill.clock {
+      font-family: "Consolas", "Courier New", monospace;
+      font-size: 0.88rem;
+      color: #e2e8f0;
+    }
+
+    .btn-small {
+      cursor: pointer;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-main);
+      transition: all 0.15s ease;
+    }
+
+    .btn-small:hover {
+      border-color: var(--gold);
+      background: var(--bg-card-hover);
+    }
+
+    .btn-small.active {
+      background: var(--gold-dim);
+      border-color: var(--gold);
+      color: var(--gold-bright);
+    }
+
+    /* COACH BANNER */
+    .coach-banner {
+      background: linear-gradient(135deg, #1b2436 0%, #131a27 100%);
+      border: 1px solid var(--gold);
+      border-radius: 12px;
+      padding: 14px 16px;
+      display: grid;
+      grid-template-columns: 1.6fr 1fr;
+      gap: 14px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+    }
+
+    .coach-banner.in-war {
+      background: linear-gradient(135deg, #3b1219 0%, #1d1118 100%);
+      border-color: var(--crimson);
+      box-shadow: 0 0 24px rgba(230, 57, 70, 0.35);
+    }
+
+    .coach-main {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .coach-header-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .war-badge {
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      background: var(--emerald-dim);
+      color: #34d399;
+      border: 1px solid var(--emerald);
+    }
+
+    .War-active .war-badge,
+    .coach-banner.in-war .war-badge {
+      background: var(--crimson-dim);
+      color: #ff6b6b;
+      border-color: var(--crimson);
+      animation: pulseWarn 1.2s infinite;
+    }
+
+    @keyframes pulseWarn {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.03); opacity: 0.85; }
+    }
+
+    .coach-advice-text {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .alerts-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 2px;
+    }
+
+    .alert-chip {
+      padding: 5px 10px;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      background: rgba(15, 23, 42, 0.75);
+      border-left: 3px solid var(--gold);
+      color: #e2e8f0;
+    }
+
+    .alert-chip.urgent {
+      border-left-color: var(--crimson);
+      background: rgba(230, 57, 70, 0.14);
+      color: #fecdd3;
+    }
+
+    .coach-side {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 10px;
+      background: rgba(11, 14, 20, 0.55);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+
+    .rec-card-box {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .rec-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--gold);
+      font-weight: 800;
+    }
+
+    .rec-name {
+      font-size: 1rem;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .rec-desc {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .tc-timer-box {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .tc-timer-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 8px;
+      background: #0f172a;
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.35s ease;
+    }
+
+    /* METRICS GRID (RESOURCES + POP/XP) */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 12px;
+    }
+
+    .metric-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 8px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .metric-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .metric-label {
+      font-size: 0.78rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .rate-badge {
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 800;
+      font-family: "Consolas", monospace;
+      background: rgba(255, 255, 255, 0.07);
+    }
+
+    .metric-value {
+      font-size: 1.65rem;
+      font-weight: 800;
+      font-family: "Consolas", "Segoe UI", monospace;
+      letter-spacing: -0.5px;
+    }
+
+    .metric-sub {
+      font-size: 0.76rem;
+      color: var(--text-muted);
+    }
+
+    .sparkline-svg {
+      width: 100%;
+      height: 30px;
+      display: block;
+    }
+
+    .card-food { border-top: 3px solid var(--food-color); }
+    .card-food .metric-value, .card-food .rate-badge { color: #f87171; }
+
+    .card-wood { border-top: 3px solid var(--wood-color); }
+    .card-wood .metric-value, .card-wood .rate-badge { color: #fbbf24; }
+
+    .card-coin { border-top: 3px solid var(--coin-color); }
+    .card-coin .metric-value, .card-coin .rate-badge { color: #fde047; }
+
+    .card-pop { border-top: 3px solid var(--pop-color); }
+    .card-pop .metric-value { color: #c084fc; }
+
+    .card-vills { border-top: 3px solid var(--emerald); }
+    .card-vills .metric-value { color: #34d399; }
+
+    .card-xp { border-top: 3px solid var(--xp-color); }
+    .card-xp .metric-value { color: #38bdf8; }
+
+    .shipment-badge-big {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #0b0e14;
+      font-weight: 900;
+      font-size: 0.85rem;
+      padding: 3px 10px;
+      border-radius: 999px;
+      box-shadow: 0 0 12px rgba(245, 158, 11, 0.45);
+    }
+
+    /* 44-CARD DECK SECTION */
+    .deck-panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .deck-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+    }
+
+    .deck-header h2 {
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: var(--gold-bright);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .deck-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+    }
+
+    .age-row {
+      display: grid;
+      grid-template-columns: 76px 1fr;
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .age-label-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 6px;
+      text-align: center;
+    }
+
+    .age-label-box.unlocked {
+      border-color: var(--gold);
+      background: linear-gradient(180deg, rgba(245, 185, 66, 0.16), rgba(26, 34, 50, 0.9));
+    }
+
+    .age-roman {
+      font-size: 1.15rem;
+      font-weight: 900;
+      color: var(--gold-bright);
+    }
+
+    .age-sub {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .age-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(11, minmax(0, 1fr));
+      gap: 7px;
+    }
+
+    .hc-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 7px 6px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 4px;
+      min-height: 68px;
+      position: relative;
+      transition: transform 0.12s ease, border-color 0.12s ease;
+    }
+
+    .hc-card:hover {
+      transform: translateY(-2px);
+      border-color: #64748b;
+    }
+
+    .hc-card.cat-eco { border-top: 3px solid #10b981; }
+    .hc-card.cat-crate { border-top: 3px solid #f59e0b; }
+    .hc-card.cat-military { border-top: 3px solid #ef4444; }
+    .hc-card.cat-spam { border-top: 3px solid #a855f7; }
+    .hc-card.cat-upgrade { border-top: 3px solid #38bdf8; }
+    .hc-card.cat-artillery { border-top: 3px solid #f97316; }
+    .hc-card.cat-boom { border-top: 3px solid #fde047; }
+
+    .hc-card.recommended {
+      border: 2px solid var(--gold-bright);
+      background: linear-gradient(180deg, rgba(245, 185, 66, 0.24), rgba(26, 34, 50, 0.95));
+      box-shadow: 0 0 14px rgba(245, 185, 66, 0.35);
+    }
+
+    .hc-card.used {
+      opacity: 0.42;
+      background: #101520;
+      border-color: #1e293b;
+    }
+
+    .hc-card.locked-age:not(.recommended):not(.used) {
+      opacity: 0.72;
+    }
+
+    .hc-card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.63rem;
+      color: var(--text-muted);
+      font-weight: 700;
+    }
+
+    .hc-tag {
+      padding: 1px 4px;
+      border-radius: 4px;
+      font-size: 0.6rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .hc-tag.tag-next {
+      background: var(--gold-bright);
+      color: #0b0e14;
+    }
+
+    .hc-tag.tag-sent {
+      background: #334155;
+      color: #94a3b8;
+    }
+
+    .hc-card-name {
+      font-size: 0.74rem;
+      font-weight: 800;
+      color: #f8fafc;
+      line-height: 1.15;
+      word-break: break-word;
+    }
+
+    .hc-card-desc {
+      font-size: 0.63rem;
+      color: var(--text-muted);
+      line-height: 1.15;
+    }
+
+    /* DOWNLOADS & SELF-UPDATE PANEL */
+    .downloads-panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .dl-info h3 {
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .dl-info p {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .dl-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .btn-dl {
+      text-decoration: none;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--border);
+      transition: all 0.15s ease;
+    }
+
+    .btn-dl.primary {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #0b0e14;
+      border-color: var(--gold-bright);
+    }
+
+    .btn-dl.secondary {
+      background: var(--bg-card);
+      color: var(--text-main);
+      border-color: #3b4c6b;
+    }
+
+    .btn-dl.apk {
+      background: linear-gradient(135deg, #059669, #10b981);
+      color: #ffffff;
+      border-color: #34d399;
+    }
+
+    .btn-dl:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.08);
+    }
+
+    /* RESPONSIVE BREAKPOINTS */
+    @media (max-width: 1200px) {
+      .metrics-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+      .age-cards-grid {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 820px) {
+      .coach-banner {
+        grid-template-columns: 1fr;
+      }
+      .metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .age-row {
+        grid-template-columns: 1fr;
+      }
+      .age-label-box {
+        flex-direction: row;
+        justify-content: space-between;
+        padding: 6px 12px;
+      }
+      .age-cards-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 480px) {
+      .age-cards-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- HEADER BAR -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="crest">RU</div>
+        <div class="brand-title">
+          <h1>
+            AoE3 Russia Coach
+            <span class="pill age" id="ageBadge">Age I • Discovery Age</span>
+          </h1>
+          <div class="brand-sub" id="playerSub">
+            Player: <strong>dali</strong> • Home City: <strong>St. Petersburg</strong> • Deck: <strong id="deckNameTop">Eco Instant Spam</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="status-pills">
+        <span class="pill live" id="connPill">● LIVE 1 Hz (age3y.exe)</span>
+        <span class="pill clock" id="gameClock">02:42</span>
+        <button class="btn-small" id="ttsBtn" onclick="toggleTTS()">🔊 Voice Coach: OFF</button>
+        <button class="btn-small" onclick="checkUpdatesModal()">⬆ v1.0.0 Updates</button>
+      </div>
+    </header>
+
+    <!-- RUSSIA COACH LIVE BANNER -->
+    <section class="coach-banner" id="coachBanner">
+      <div class="coach-main">
+        <div class="coach-header-row">
+          <span class="war-badge" id="warBadge">PEACE — ECO &amp; AGE-UP PHASE</span>
+          <span style="font-size: 0.78rem; color: var(--text-muted);" id="serverEndpointLabel">
+            Endpoint: <code id="endpointCode">http://127.0.0.1:8765</code>
+          </span>
+        </div>
+        <div class="coach-advice-text" id="coachAdvice">
+          1 SHIPMENT READY + 838 FOOD BANKED! Click Age Up to Colonial Age (800 Food) right now, and send Distributivism (+1.25 Wood/s trickle) or Economic Theory!
+        </div>
+        <div class="alerts-row" id="alertsContainer"></div>
+      </div>
+
+      <div class="coach-side">
+        <div class="rec-card-box">
+          <div>
+            <div class="rec-label">★ NEXT RECOMMENDED CARD</div>
+            <div class="rec-name" id="recCardName">Distributivism</div>
+            <div class="rec-desc" id="recCardDesc">+1.25 Wood/s Trickle (Age I)</div>
+          </div>
+          <div class="shipment-badge-big" id="recShipmentChip">1 READY</div>
+        </div>
+
+        <div class="tc-timer-box">
+          <div class="tc-timer-header">
+            <span>TC 3-Settler Batch Heartbeat (270 Food)</span>
+            <span id="tcTimerText">READY (838F)</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="tcProgressFill" style="width: 100%; background: var(--emerald);"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- LIVE METRICS & SPARKLINES -->
+    <section class="metrics-grid">
+      <!-- FOOD -->
+      <div class="metric-card card-food">
+        <div class="metric-top">
+          <span class="metric-label">🥩 FOOD</span>
+          <span class="rate-badge" id="foodRate">+0.00/s</span>
+        </div>
+        <div class="metric-value" id="foodVal">838.24</div>
+        <svg class="sparkline-svg" id="foodSpark" viewBox="0 0 120 30" preserveAspectRatio="none"></svg>
+        <div class="metric-sub" id="foodSub">3-Settler Batch: 270F • Age II: 800F</div>
+      </div>
+
+      <!-- WOOD -->
+      <div class="metric-card card-wood">
+        <div class="metric-top">
+          <span class="metric-label">🪵 WOOD</span>
+          <span class="rate-badge" id="woodRate">+0.00/s</span>
+        </div>
+        <div class="metric-value" id="woodVal">289.33</div>
+        <svg class="sparkline-svg" id="woodSpark" viewBox="0 0 120 30" preserveAspectRatio="none"></svg>
+        <div class="metric-sub" id="woodSub">House: 100W • Blockhouse: 250W</div>
+      </div>
+
+      <!-- COIN -->
+      <div class="metric-card card-coin">
+        <div class="metric-top">
+          <span class="metric-label">🪙 COIN</span>
+          <span class="rate-badge" id="coinRate">+0.00/s</span>
+        </div>
+        <div class="metric-value" id="coinVal">106.56</div>
+        <svg class="sparkline-svg" id="coinSpark" viewBox="0 0 120 30" preserveAspectRatio="none"></svg>
+        <div class="metric-sub" id="coinSub">Age III Fortress: 1200F + 1000C</div>
+      </div>
+
+      <!-- POPULATION -->
+      <div class="metric-card card-pop">
+        <div class="metric-top">
+          <span class="metric-label">🏠 POPULATION</span>
+          <span class="rate-badge" id="popHeadroomBadge">5 free</span>
+        </div>
+        <div class="metric-value" id="popVal">5 / 10</div>
+        <div class="progress-track">
+          <div class="progress-fill" id="popProgressFill" style="width: 50%; background: var(--pop-color);"></div>
+        </div>
+        <div class="metric-sub" id="popSub">5 pop headroom remaining</div>
+      </div>
+
+      <!-- VILLAGERS -->
+      <div class="metric-card card-vills">
+        <div class="metric-top">
+          <span class="metric-label">⚒️ VILLAGERS</span>
+          <span class="rate-badge" style="color: #34d399;">Batch x3</span>
+        </div>
+        <div class="metric-value" id="villVal">5</div>
+        <div class="progress-track">
+          <div class="progress-fill" id="villProgressFill" style="width: 15%; background: var(--emerald);"></div>
+        </div>
+        <div class="metric-sub">Russian Settlers (Max 99)</div>
+      </div>
+
+      <!-- SHIPMENTS & XP NEEDED (324 XP) -->
+      <div class="metric-card card-xp">
+        <div class="metric-top">
+          <span class="metric-label">📦 SHIPMENTS &amp; XP</span>
+          <span class="shipment-badge-big" id="shipmentsVal">1</span>
+        </div>
+        <div class="metric-value" id="xpNeededVal" style="font-size: 1.35rem;">324 XP needed</div>
+        <div class="progress-track">
+          <div class="progress-fill" id="xpProgressFill" style="width: 6.1%; background: var(--xp-color);"></div>
+        </div>
+        <div class="metric-sub" id="xpSub">324 XP needed for Shipment #2 (321 / 645 XP)</div>
+      </div>
+    </section>
+
+    <!-- 44-CARD "ECO INSTANT SPAM" DECK TRACKER -->
+    <section class="deck-panel">
+      <div class="deck-header">
+        <h2>
+          🃏 Active Deck: <span id="deckNameTitle">Eco Instant Spam</span>
+          <span class="pill" id="deckCountBadge">44 Cards (Age I–IV)</span>
+        </h2>
+        <div class="deck-legend">
+          <span class="legend-item"><span class="legend-dot" style="background: var(--gold-bright);"></span>★ Recommended Next</span>
+          <span class="legend-item"><span class="legend-dot" style="background: #10b981;"></span>Eco</span>
+          <span class="legend-item"><span class="legend-dot" style="background: #f59e0b;"></span>Crates</span>
+          <span class="legend-item"><span class="legend-dot" style="background: #a855f7;"></span>Instant Spam</span>
+          <span class="legend-item"><span class="legend-dot" style="background: #ef4444;"></span>Military</span>
+          <span class="legend-item"><span class="legend-dot" style="background: #f97316;"></span>Artillery</span>
+        </div>
+      </div>
+
+      <div id="deckRowsContainer" style="display: flex; flex-direction: column; gap: 10px;"></div>
+    </section>
+
+    <!-- SELF-UPDATER & DOWNLOADS -->
+    <section class="downloads-panel">
+      <div class="dl-info">
+        <h3>⬇ Self-Updating Companion Apps (v1.0.0 • GitHub Releases &amp; Local Mirror)</h3>
+        <p id="versionStatusText">
+          Auto-updates live from <code>github.com/DALI951/aoe3-assistant/releases/latest</code> &amp; <code>/api/version</code>
+        </p>
+      </div>
+      <div class="dl-buttons">
+        <a class="btn-dl primary" id="dlSetupBtn" href="/releases/AoE3AssistantSetup.exe" download>
+          💻 Windows Setup (.exe)
+        </a>
+        <a class="btn-dl secondary" id="dlExeBtn" href="/releases/AoE3Assistant.exe" download>
+          ⚡ Portable HUD (.exe)
+        </a>
+        <a class="btn-dl apk" id="dlApkBtn" href="/releases/AoE3Assistant.apk" download>
+          📱 Android Companion (.apk)
+        </a>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    let ttsEnabled = false;
+    let lastSpokenAdvice = "";
+    let lastSpeakTime = 0;
+
+    function toggleTTS() {
+      ttsEnabled = !ttsEnabled;
+      const btn = document.getElementById("ttsBtn");
+      btn.textContent = ttsEnabled ? "🔊 Voice Coach: ON" : "🔊 Voice Coach: OFF";
+      btn.classList.toggle("active", ttsEnabled);
+      if (ttsEnabled && "speechSynthesis" in window) {
+        const u = new SpeechSynthesisUtterance("Russia Coach voice callouts enabled.");
+        u.rate = 1.08;
+        window.speechSynthesis.speak(u);
+      }
+    }
+
+    function maybeSpeak(text) {
+      if (!ttsEnabled || !("speechSynthesis" in window) || !text) return;
+      const now = Date.now();
+      if (text === lastSpokenAdvice && now - lastSpeakTime < 20000) return;
+      if (now - lastSpeakTime < 7000) return;
+      lastSpokenAdvice = text;
+      lastSpeakTime = now;
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = 1.08;
+      window.speechSynthesis.speak(u);
+    }
+
+    function formatRate(val) {
+      const n = Number(val || 0);
+      return (n >= 0 ? "+" : "") + n.toFixed(2) + "/s";
+    }
+
+    function drawSparkline(svgId, history, key, strokeColor) {
+      const svg = document.getElementById(svgId);
+      if (!svg || !Array.isArray(history) || history.length < 2) return;
+      const vals = history.map(h => Number(h[key] || 0));
+      const min = Math.min(...vals);
+      const max = Math.max(...vals);
+      const span = Math.max(1, max - min);
+      const pts = vals.map((v, idx) => {
+        const x = (idx / (vals.length - 1)) * 120;
+        const y = 26 - ((v - min) / span) * 22;
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      }).join(" ");
+      svg.innerHTML = `
+        <polyline fill="none" stroke="${strokeColor}" stroke-width="2" points="${pts}" />
+      `;
+    }
+
+    function renderDeck(cards, currentAge) {
+      const container = document.getElementById("deckRowsContainer");
+      if (!container || !Array.isArray(cards)) return;
+
+      const ageMeta = {
+        1: { roman: "AGE I", name: "Discovery" },
+        2: { roman: "AGE II", name: "Colonial" },
+        3: { roman: "AGE III", name: "Fortress" },
+        4: { roman: "AGE IV", name: "Industrial" }
+      };
+
+      let html = "";
+      for (let age = 1; age <= 4; age++) {
+        const rowCards = cards.filter(c => Number(c.age) === age);
+        const unlocked = age <= Number(currentAge || 1);
+        html += `
+          <div class="age-row">
+            <div class="age-label-box ${unlocked ? "unlocked" : ""}">
+              <div class="age-roman">${ageMeta[age].roman}</div>
+              <div class="age-sub">${ageMeta[age].name}</div>
+            </div>
+            <div class="age-cards-grid">
+              ${rowCards.map(c => {
+                const isRec = Boolean(c.recommended);
+                const isUsed = Boolean(c.used);
+                const cat = c.category || "eco";
+                const classes = [
+                  "hc-card",
+                  "cat-" + cat,
+                  isRec ? "recommended" : "",
+                  isUsed ? "used" : "",
+                  !unlocked ? "locked-age" : ""
+                ].filter(Boolean).join(" ");
+
+                let tagHtml = `<span>#${c.slot || (c.index + 1)}</span>`;
+                if (isRec) {
+                  tagHtml += `<span class="hc-tag tag-next">★ NEXT</span>`;
+                } else if (isUsed) {
+                  tagHtml += `<span class="hc-tag tag-sent">✓ SENT</span>`;
+                }
+
+                return `
+                  <div class="${classes}" title="${c.name} (${c.tech}) — ${c.short_desc || ""}">
+                    <div class="hc-card-top">${tagHtml}</div>
+                    <div class="hc-card-name">${c.name}</div>
+                    <div class="hc-card-desc">${c.short_desc || ""}</div>
+                  </div>
+                `;
+              }).join("")}
+            </div>
+          </div>
+        `;
+      }
+      container.innerHTML = html;
+    }
+
+    function renderState(s) {
+      if (!s || typeof s !== "object") return;
+
+      // Top bar
+      document.getElementById("ageBadge").textContent = `Age ${s.age_roman || "I"} • ${s.age_name || "Discovery Age"}`;
+      document.getElementById("gameClock").textContent = s.game_time_formatted || "02:42";
+      document.getElementById("deckNameTop").textContent = s.deck_name || "Eco Instant Spam";
+      document.getElementById("deckNameTitle").textContent = s.deck_name || "Eco Instant Spam";
+
+      if (s.server_info && s.server_info.lan_url) {
+        document.getElementById("endpointCode").textContent =
+          `${s.server_info.lan_url} • ${s.server_info.remote_domain || "https://modali.powerpme.com"}`;
+      }
+
+      // Coach banner & war state
+      const banner = document.getElementById("coachBanner");
+      const warBadge = document.getElementById("warBadge");
+      banner.classList.toggle("in-war", Boolean(s.in_war));
+      warBadge.textContent = s.war_status || (s.in_war ? "ACTIVE WAR — COMBAT ALERT!" : "PEACE — ECO & AGE-UP PHASE");
+
+      document.getElementById("coachAdvice").textContent = s.coach_advice || "";
+      if (s.in_war || (s.shipments_available || 0) > 0) {
+        maybeSpeak(s.coach_advice);
+      }
+
+      // Alerts
+      const alertsEl = document.getElementById("alertsContainer");
+      if (Array.isArray(s.alerts)) {
+        alertsEl.innerHTML = s.alerts.map(a => {
+          const lvl = a.level || "info";
+          const title = a.title || a.message || "";
+          return `<div class="alert-chip ${lvl}"><strong>${title}</strong></div>`;
+        }).join("");
+      }
+
+      // Recommended card
+      const rec = s.recommended_card || {};
+      document.getElementById("recCardName").textContent = rec.name || "Distributivism";
+      document.getElementById("recCardDesc").textContent =
+        `${rec.short_desc || "+1.25 Wood/s Trickle"} (Age ${rec.age || 1})`;
+
+      const ships = Number(s.shipments_available ?? 1);
+      document.getElementById("recShipmentChip").textContent = `${ships} READY`;
+
+      // Resources
+      document.getElementById("foodVal").textContent = Number(s.food ?? 838.24).toFixed(2);
+      document.getElementById("woodVal").textContent = Number(s.wood ?? 289.33).toFixed(2);
+      document.getElementById("coinVal").textContent = Number(s.coin ?? 106.56).toFixed(2);
+
+      document.getElementById("foodRate").textContent = formatRate(s.food_per_sec);
+      document.getElementById("woodRate").textContent = formatRate(s.wood_per_sec);
+      document.getElementById("coinRate").textContent = formatRate(s.coin_per_sec);
+
+      // TC batch status
+      const foodNum = Number(s.food ?? 838.24);
+      const tcFill = document.getElementById("tcProgressFill");
+      const tcText = document.getElementById("tcTimerText");
+      const pctFood = Math.min(100, Math.round((foodNum / 270) * 100));
+      tcFill.style.width = `${pctFood}%`;
+      tcText.textContent = foodNum >= 270 ? `READY (${foodNum.toFixed(0)}F >= 270F)` : `${foodNum.toFixed(0)} / 270 Food`;
+
+      // Pop & Villagers
+      const pop = Number(s.pop ?? 5);
+      const popCap = Math.max(1, Number(s.pop_cap ?? 10));
+      const headroom = Math.max(0, popCap - pop);
+      document.getElementById("popVal").textContent = `${pop} / ${popCap}`;
+      document.getElementById("popHeadroomBadge").textContent = `${headroom} free`;
+      document.getElementById("popProgressFill").style.width = `${Math.min(100, (pop / popCap) * 100)}%`;
+      document.getElementById("popSub").textContent =
+        headroom <= 3 ? "⚠ ALMOST HOUSED! Build House (100W)" : `${headroom} pop headroom remaining`;
+
+      const vills = Number(s.villagers ?? 5);
+      document.getElementById("villVal").textContent = `${vills}`;
+      document.getElementById("villProgressFill").style.width = `${Math.min(100, (vills / 99) * 100)}%`;
+
+      // Shipments & XP Needed (exact 324 XP)
+      const xpNeeded = Number(s.xp_needed_next ?? 324);
+      const xpCur = Number(s.xp_current ?? 321);
+      const xpNext = Number(s.xp_next_threshold ?? 645);
+      const xpPct = Number(s.xp_progress_pct ?? 6.1);
+      const nextNum = Number(s.next_shipment_number ?? (ships + 1));
+
+      document.getElementById("shipmentsVal").textContent = `${ships}`;
+      document.getElementById("xpNeededVal").textContent = `${xpNeeded} XP needed`;
+      document.getElementById("xpProgressFill").style.width = `${Math.min(100, Math.max(4, xpPct))}%`;
+      document.getElementById("xpSub").textContent =
+        `${xpNeeded} XP needed for Shipment #${nextNum} (${xpCur.toFixed(0)} / ${xpNext.toFixed(0)} XP)`;
+
+      // Sparklines
+      if (Array.isArray(s.history)) {
+        drawSparkline("foodSpark", s.history, "food", "#f87171");
+        drawSparkline("woodSpark", s.history, "wood", "#fbbf24");
+        drawSparkline("coinSpark", s.history, "coin", "#fde047");
+      }
+
+      // 44-Card Deck Grid
+      if (Array.isArray(s.cards)) {
+        document.getElementById("deckCountBadge").textContent =
+          `${s.cards.filter(c => !c.used).length}/${s.cards.length} Available (Age I–IV)`;
+        renderDeck(s.cards, s.age || 1);
+      }
+    }
+
+    async function fetchInitialState() {
+      try {
+        const res = await fetch("/api/state", { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          renderState(data);
+        }
+      } catch (e) {
+        console.warn("Initial state fetch error:", e);
+      }
+    }
+
+    async function checkUpdatesModal() {
+      try {
+        const res = await fetch("/api/version", { cache: "no-store" });
+        const v = await res.json();
+        document.getElementById("versionStatusText").innerHTML =
+          `Latest Version: <strong>v${v.version}</strong> (EXE v${v.exe_version} • APK v${v.apk_version}) — ` +
+          `<a href="${v.repo_url}/releases" target="_blank" style="color: var(--gold-bright);">GitHub Releases (${v.repo})</a>`;
+      } catch (e) {
+        console.warn("Version check failed:", e);
+      }
+    }
+
+    function connectStream() {
+      const pill = document.getElementById("connPill");
+      if ("EventSource" in window) {
+        const es = new EventSource("/api/stream");
+        es.onopen = () => {
+          pill.textContent = "● LIVE 1 Hz SSE (age3y.exe)";
+          pill.className = "pill live";
+        };
+        es.onmessage = (ev) => {
+          try {
+            const data = JSON.parse(ev.data);
+            renderState(data);
+          } catch (e) {}
+        };
+        es.onerror = () => {
+          pill.textContent = "⟳ Reconnecting...";
+        };
+      } else {
+        setInterval(fetchInitialState, 1000);
+      }
+    }
+
+    fetchInitialState();
+    checkUpdatesModal();
+    connectStream();
+    setInterval(fetchInitialState, 2000);
+  </script>
+</body>
+</html>

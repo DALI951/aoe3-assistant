@@ -1,0 +1,1561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>AoE3 Russia Coach — Live Mobile Companion</title>
+<style>
+  :root {
+    --bg-dark: #090d14;
+    --bg-card: #111826;
+    --bg-card-alt: #162032;
+    --border: #24324a;
+    --gold: #f5b942;
+    --gold-dim: rgba(245, 185, 66, 0.16);
+    --crimson: #e11d48;
+    --crimson-dim: rgba(225, 29, 72, 0.2);
+    --emerald: #10b981;
+    --emerald-dim: rgba(16, 185, 129, 0.16);
+    --amber: #f59e0b;
+    --amber-dim: rgba(245, 158, 11, 0.18);
+    --blue: #38bdf8;
+    --text-main: #f1f5f9;
+    --text-muted: #94a3b8;
+    --food-color: #ef4444;
+    --wood-color: #a36a3e;
+    --coin-color: #eab308;
+  }
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    background: var(--bg-dark);
+    color: var(--text-main);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.38;
+    padding-bottom: 32px;
+    user-select: none;
+  }
+  .header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(9, 13, 20, 0.96);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 12px;
+    backdrop-filter: blur(8px);
+  }
+  .header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .crest {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #991b1b, #450a0a);
+    border: 1.5px solid var(--gold);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    color: var(--gold);
+    font-size: 16px;
+    box-shadow: 0 0 10px rgba(245, 185, 66, 0.25);
+  }
+  .brand-title {
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+    color: var(--gold);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .ver-pill {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 99px;
+    background: var(--gold-dim);
+    color: var(--gold);
+    border: 1px solid rgba(245, 185, 66, 0.35);
+  }
+  .brand-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-icon {
+    background: var(--bg-card-alt);
+    color: var(--text-main);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 9px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .btn-icon.active {
+    background: var(--gold-dim);
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+  .status-strip {
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 6px 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 11px;
+  }
+  .conn-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 700;
+  }
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--emerald);
+    box-shadow: 0 0 8px var(--emerald);
+  }
+  .dot.warn {
+    background: var(--amber);
+    box-shadow: 0 0 8px var(--amber);
+  }
+  .dot.err {
+    background: var(--crimson);
+    box-shadow: 0 0 8px var(--crimson);
+  }
+  .container {
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 680px;
+    margin: 0 auto;
+  }
+  .drawer {
+    background: var(--bg-card);
+    border: 1px solid var(--gold);
+    border-radius: 10px;
+    padding: 12px;
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .drawer.open {
+    display: flex;
+  }
+  .drawer-title {
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: var(--gold);
+    letter-spacing: 0.5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .input-row {
+    display: flex;
+    gap: 6px;
+  }
+  .url-input {
+    flex: 1;
+    background: #070a10;
+    color: var(--text-main);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 13px;
+    font-family: monospace;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, #f5b942, #d97706);
+    color: #090d14;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 13px;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  .btn-secondary {
+    background: var(--bg-card-alt);
+    color: var(--text-main);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 11px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .chip {
+    background: var(--bg-card-alt);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 11px;
+    font-family: monospace;
+    cursor: pointer;
+  }
+  .chip.active {
+    background: var(--gold-dim);
+    color: var(--gold);
+    border-color: var(--gold);
+    font-weight: 700;
+  }
+  .war-banner {
+    border-radius: 10px;
+    padding: 9px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-weight: 800;
+    font-size: 12px;
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    background: linear-gradient(90deg, rgba(16, 185, 129, 0.16), rgba(17, 24, 38, 0.9));
+    color: #34d399;
+  }
+  .war-banner.in-war {
+    border-color: var(--crimson);
+    background: linear-gradient(90deg, rgba(225, 29, 72, 0.35), rgba(127, 29, 29, 0.45));
+    color: #fecdd3;
+    animation: pulseWar 1.1s infinite alternate;
+  }
+  @keyframes pulseWar {
+    from { box-shadow: 0 0 4px rgba(225, 29, 72, 0.4); }
+    to { box-shadow: 0 0 18px rgba(225, 29, 72, 0.85); }
+  }
+  .coach-panel {
+    background: linear-gradient(145deg, #161f33, #0e1524);
+    border: 1.5px solid var(--gold);
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  }
+  .coach-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .coach-label {
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    color: var(--gold);
+  }
+  .age-badge {
+    font-size: 11px;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: var(--gold-dim);
+    color: var(--gold);
+    border: 1px solid rgba(245, 185, 66, 0.4);
+  }
+  .coach-advice-text {
+    font-size: 14px;
+    font-weight: 800;
+    color: #ffffff;
+    margin-bottom: 10px;
+  }
+  .tc-box {
+    background: rgba(9, 13, 20, 0.75);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+  }
+  .tc-box.warning {
+    border-color: var(--crimson);
+    background: rgba(225, 29, 72, 0.16);
+  }
+  .tc-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 5px;
+  }
+  .progress-track {
+    width: 100%;
+    height: 7px;
+    background: #070a10;
+    border-radius: 99px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.07);
+  }
+  .progress-fill {
+    height: 100%;
+    border-radius: 99px;
+    transition: width 0.3s ease;
+  }
+  .rec-card-box {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    background: rgba(245, 185, 66, 0.12);
+    border: 1px solid rgba(245, 185, 66, 0.45);
+    border-radius: 8px;
+    padding: 8px 10px;
+  }
+  .rec-card-title {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--gold);
+  }
+  .rec-card-desc {
+    font-size: 11px;
+    color: var(--text-main);
+  }
+  .res-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .res-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px;
+    position: relative;
+    overflow: hidden;
+  }
+  .res-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+  }
+  .res-card.food::before { background: var(--food-color); }
+  .res-card.wood::before { background: var(--wood-color); }
+  .res-card.coin::before { background: var(--coin-color); }
+  .res-label {
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .res-val {
+    font-size: 20px;
+    font-weight: 900;
+    margin: 3px 0 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  .res-card.food .res-val { color: #fca5a5; }
+  .res-card.wood .res-val { color: #fdba74; }
+  .res-card.coin .res-val { color: #fde047; }
+  .res-rate {
+    font-size: 12px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    color: var(--emerald);
+  }
+  .res-sub {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+  .stat-card.highlight {
+    border-color: var(--gold);
+    background: linear-gradient(135deg, rgba(245, 185, 66, 0.15), var(--bg-card));
+  }
+  .stat-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+  .stat-main {
+    font-size: 21px;
+    font-weight: 900;
+    margin: 3px 0;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-main);
+  }
+  .stat-card.highlight .stat-main {
+    color: var(--gold);
+  }
+  .stat-foot {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .alerts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .alert-item {
+    background: var(--bg-card);
+    border-left: 4px solid var(--gold);
+    border-top: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+  }
+  .alert-item.urgent {
+    border-left-color: var(--crimson);
+    background: rgba(225, 29, 72, 0.1);
+  }
+  .alert-item.warning {
+    border-left-color: var(--amber);
+    background: rgba(245, 158, 11, 0.08);
+  }
+  .alert-title {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--text-main);
+  }
+  .alert-msg {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+  .section-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+  }
+  .section-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .section-title {
+    font-size: 13px;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: var(--gold);
+    letter-spacing: 0.5px;
+  }
+  .filter-tabs {
+    display: flex;
+    gap: 5px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    margin-bottom: 10px;
+  }
+  .tab-btn {
+    background: var(--bg-card-alt);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    padding: 5px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .tab-btn.active {
+    background: var(--gold);
+    color: #090d14;
+    border-color: var(--gold);
+  }
+  .deck-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 7px;
+  }
+  .deck-card {
+    background: var(--bg-card-alt);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 4px;
+    position: relative;
+  }
+  .deck-card.recommended {
+    border: 1.5px solid var(--gold);
+    background: linear-gradient(145deg, rgba(245, 185, 66, 0.18), rgba(22, 32, 50, 0.95));
+    box-shadow: 0 0 10px rgba(245, 185, 66, 0.2);
+  }
+  .deck-card.used {
+    opacity: 0.48;
+    border-style: dashed;
+  }
+  .dc-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 4px;
+  }
+  .dc-age {
+    font-size: 10px;
+    font-weight: 900;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: #1e293b;
+    color: var(--text-main);
+  }
+  .dc-age.age-1 { background: rgba(56, 189, 248, 0.2); color: #7dd3fc; }
+  .dc-age.age-2 { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; }
+  .dc-age.age-3 { background: rgba(245, 158, 11, 0.22); color: #fcd34d; }
+  .dc-age.age-4 { background: rgba(225, 29, 72, 0.22); color: #fda4af; }
+  .dc-badge {
+    font-size: 9px;
+    font-weight: 800;
+    padding: 1px 5px;
+    border-radius: 4px;
+    text-transform: uppercase;
+  }
+  .dc-badge.rec { background: var(--gold); color: #090d14; }
+  .dc-badge.ready { background: var(--emerald-dim); color: #34d399; }
+  .dc-badge.sent { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
+  .dc-name {
+    font-size: 12px;
+    font-weight: 800;
+    color: #ffffff;
+  }
+  .dc-desc {
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+  .dc-tech {
+    font-size: 9px;
+    font-family: monospace;
+    color: #64748b;
+  }
+  .updater-panel {
+    background: linear-gradient(145deg, #131b2e, #0d1322);
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 12px;
+  }
+  .updater-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin: 8px 0 10px;
+  }
+  .up-box {
+    background: rgba(9, 13, 20, 0.65);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px;
+  }
+  .up-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  .up-val {
+    font-size: 15px;
+    font-weight: 900;
+    color: var(--gold);
+    margin-top: 2px;
+  }
+  .btn-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-top">
+    <div class="brand">
+      <div class="crest">🦅</div>
+      <div>
+        <div class="brand-title">
+          AoE3 RUSSIA COACH
+          <span class="ver-pill" id="headerVerBadge">v1.0.0</span>
+        </div>
+        <div class="brand-sub" id="playerSubTitle">dali • Russians • St. Petersburg</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn-icon active" id="btnTtsToggle" onclick="toggleTts()">🔊 TTS: ON</button>
+      <button class="btn-icon" id="btnServerDrawer" onclick="toggleServerDrawer()">🌐 Server</button>
+      <button class="btn-icon" onclick="scrollToUpdater()">⬇️ APK</button>
+    </div>
+  </div>
+
+  <div class="status-strip">
+    <div class="conn-indicator">
+      <span class="dot" id="connDot"></span>
+      <span id="connStatusText">LIVE • age3y.exe (PID 448)</span>
+    </div>
+    <div style="display:flex; gap:10px; color:var(--text-muted); font-weight:700;">
+      <span id="gameTimeBadge">⏱ 02:42</span>
+      <span id="serverHostBadge" style="font-family:monospace; color:var(--gold);">192.168.1.154:8765</span>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+
+  <!-- Configurable Server URL & Quick LAN IP Switcher Drawer -->
+  <section class="drawer" id="serverDrawer">
+    <div class="drawer-title">
+      <span>🌐 Server Endpoint & Quick LAN Switcher</span>
+      <span style="font-size:10px; color:var(--emerald);" id="autoReconnectBadge">Auto-Reconnect: ON</span>
+    </div>
+    <div class="input-row">
+      <input type="text" class="url-input" id="serverUrlInput" value="http://192.168.1.154:8765" placeholder="https://modali.powerpme or http://192.168.1.154:8765" />
+      <button class="btn-primary" onclick="applyCustomServerUrl()">Connect</button>
+    </div>
+    <div style="font-size:11px; color:var(--text-muted);">Tap a preset to switch instantly (auto-failover enabled):</div>
+    <div class="chip-row">
+      <button class="chip active" onclick="selectServerPreset('http://192.168.1.154:8765', this)">http://192.168.1.154:8765 (PC LAN)</button>
+      <button class="chip" onclick="selectServerPreset('https://modali.powerpme', this)">https://modali.powerpme</button>
+      <button class="chip" onclick="selectServerPreset('https://modali.powerpme.com/aoe3', this)">https://modali.powerpme.com/aoe3</button>
+      <button class="chip" onclick="selectServerPreset('http://10.0.2.2:8765', this)">http://10.0.2.2:8765 (Emulator)</button>
+    </div>
+    <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; color:var(--text-muted);">
+      <span id="lastSyncInfo">Last telemetry sync: Active (1 Hz)</span>
+      <button class="btn-secondary" onclick="testVoiceAlert()">🔊 Test Voice Alert</button>
+    </div>
+  </section>
+
+  <!-- War / Unit-Loss Banner -->
+  <section class="war-banner" id="warBanner">
+    <div>
+      <span id="warIcon">🛡️</span>
+      <span id="warStatusText">PEACE — Eco & Age-Up Phase</span>
+    </div>
+    <span id="unitLossBadge" style="font-size:11px; opacity:0.9;">Losses: 0</span>
+  </section>
+
+  <!-- Live Russia Coach & TC 3-Settler Reminder -->
+  <section class="coach-panel">
+    <div class="coach-header">
+      <span class="coach-label">⚡ LIVE RUSSIA COACH — ST. PETERSBURG</span>
+      <span class="age-badge" id="ageBadge">AGE I • DISCOVERY</span>
+    </div>
+    <div class="coach-advice-text" id="coachAdviceText">
+      1 SHIPMENT READY + 838 FOOD BANKED! Click Age Up to Colonial Age (800 Food) right now, and send Distributivism (+1.25 Wood/s trickle) or Economic Theory (+10% gather)!
+    </div>
+
+    <!-- TC 3-Settler Batch Heartbeat -->
+    <div class="tc-box" id="tcBox">
+      <div class="tc-row">
+        <span style="color:var(--gold);">🏛️ Russian TC 3-Settler Batch (270 Food / 53s)</span>
+        <span id="tcTimerLabel" style="font-family:monospace; color:var(--emerald);">18s / 53s • READY</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="tcProgressFill" style="width: 34%; background: linear-gradient(90deg, #10b981, #f5b942);"></div>
+      </div>
+      <div style="font-size:11px; color:var(--text-muted); margin-top:5px;" id="tcStatusText">
+        838 Food banked (&gt;= 800F): Click Age Up to Colonial Age, or queue 3 Settlers (270F)!
+      </div>
+    </div>
+
+    <!-- Next Recommended Card Spotlight -->
+    <div class="rec-card-box">
+      <div>
+        <div style="font-size:10px; font-weight:800; color:var(--text-muted); text-transform:uppercase;">★ Next Recommended Card (Eco Instant Spam)</div>
+        <div class="rec-card-title" id="recCardName">Distributivism (Age I • #3440)</div>
+        <div class="rec-card-desc" id="recCardReason">+1.25 Wood/s Trickle — 1 Shipment ready in Age I!</div>
+      </div>
+      <div style="text-align:right;">
+        <span class="dc-badge rec">SEND NOW</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Live Resource Cards (Food, Wood, Coin + exact /s gather rates) -->
+  <section class="res-grid">
+    <div class="res-card food">
+      <div class="res-label">
+        <span>🥩 FOOD</span>
+        <span class="res-rate" id="foodRate">+0.00/s</span>
+      </div>
+      <div class="res-val" id="foodVal">838.24</div>
+      <div class="res-sub" id="foodHint">&gt;=800F Age Up Ready!</div>
+    </div>
+
+    <div class="res-card wood">
+      <div class="res-label">
+        <span>🪵 WOOD</span>
+        <span class="res-rate" id="woodRate">+0.00/s</span>
+      </div>
+      <div class="res-val" id="woodVal">289.33</div>
+      <div class="res-sub" id="woodHint">Blockhouse (250W) Ready</div>
+    </div>
+
+    <div class="res-card coin">
+      <div class="res-label">
+        <span>🪙 COIN</span>
+        <span class="res-rate" id="coinRate">+0.00/s</span>
+      </div>
+      <div class="res-val" id="coinVal">106.56</div>
+      <div class="res-sub" id="coinHint">Market / Age III Bank</div>
+    </div>
+  </section>
+
+  <!-- Pop, Villagers, Shipments, Exact XP Needed (324) -->
+  <section class="stats-grid">
+    <div class="stat-card" id="popCard">
+      <div class="stat-top">
+        <span>🏠 POPULATION</span>
+        <span id="popHeadroomBadge" style="color:var(--emerald);">+5 Free</span>
+      </div>
+      <div class="stat-main" id="popVal">5/10</div>
+      <div class="progress-track" style="margin:4px 0;">
+        <div class="progress-fill" id="popBar" style="width:50%; background:var(--emerald);"></div>
+      </div>
+      <div class="stat-foot" id="popFoot">10 Pop Cap (Build House at 8/10)</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-top">
+        <span>⛏️ VILLAGERS</span>
+        <span style="color:var(--gold);">3-Batch Civ</span>
+      </div>
+      <div class="stat-main" id="villagersVal">5</div>
+      <div class="progress-track" style="margin:4px 0;">
+        <div class="progress-fill" id="vilBar" style="width:15%; background:var(--blue);"></div>
+      </div>
+      <div class="stat-foot">270 Food = 3 Russian Settlers</div>
+    </div>
+
+    <div class="stat-card highlight" id="shipmentCard">
+      <div class="stat-top">
+        <span>📦 SHIPMENTS</span>
+        <span id="shipmentReadyBadge" style="color:var(--gold);">READY!</span>
+      </div>
+      <div class="stat-main" id="shipmentsVal">1</div>
+      <div class="stat-foot" id="shipmentDeckFoot">Deck: Eco Instant Spam</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-top">
+        <span>⭐ XP NEEDED NEXT</span>
+        <span id="xpCurrentBadge" style="color:var(--blue);">321 / 645 XP</span>
+      </div>
+      <div class="stat-main" id="xpNeededVal" style="color:#38bdf8;">324</div>
+      <div class="progress-track" style="margin:4px 0;">
+        <div class="progress-fill" id="xpBar" style="width:6.1%; background:var(--blue);"></div>
+      </div>
+      <div class="stat-foot" id="xpFoot">324 XP needed for Shipment #2</div>
+    </div>
+  </section>
+
+  <!-- Live Coaching Alerts Feed -->
+  <section class="alerts-list" id="alertsList"></section>
+
+  <!-- 44-Card "Eco Instant Spam" Age I-IV Deck Tracker -->
+  <section class="section-card">
+    <div class="section-head">
+      <div>
+        <div class="section-title">🃏 <span id="deckNameTitle">Eco Instant Spam</span> (44 Cards)</div>
+        <div style="font-size:11px; color:var(--text-muted);" id="deckStatsSub">44 Total • 0 Sent • 44 Available across Age I-IV</div>
+      </div>
+    </div>
+
+    <div class="filter-tabs">
+      <button class="tab-btn active" onclick="setCardFilter('all', this)">All (44)</button>
+      <button class="tab-btn" onclick="setCardFilter('1', this)">Age I (11)</button>
+      <button class="tab-btn" onclick="setCardFilter('2', this)">Age II (11)</button>
+      <button class="tab-btn" onclick="setCardFilter('3', this)">Age III (11)</button>
+      <button class="tab-btn" onclick="setCardFilter('4', this)">Age IV (11)</button>
+      <button class="tab-btn" onclick="setCardFilter('ready', this)">Ready</button>
+      <button class="tab-btn" onclick="setCardFilter('used', this)">Sent</button>
+    </div>
+
+    <div class="deck-grid" id="deckGrid"></div>
+  </section>
+
+  <!-- Built-in APK Self-Updater -->
+  <section class="updater-panel" id="updaterSection">
+    <div class="section-head" style="margin-bottom:6px;">
+      <div>
+        <div class="section-title">📲 Android APK Self-Updater</div>
+        <div style="font-size:11px; color:var(--text-muted);">Checks Server `/api/version` & GitHub Releases `DALI951/aoe3-assistant`</div>
+      </div>
+      <span class="ver-pill" id="updaterStatusPill">UP TO DATE</span>
+    </div>
+
+    <div class="updater-grid">
+      <div class="up-box">
+        <div class="up-label">Installed APK Version</div>
+        <div class="up-val" id="installedApkVer">v1.0.0</div>
+      </div>
+      <div class="up-box">
+        <div class="up-label">Latest Release Version</div>
+        <div class="up-val" id="remoteApkVer">v1.0.0</div>
+      </div>
+    </div>
+
+    <div style="font-size:11px; color:var(--text-muted); margin-bottom:10px;" id="releaseNotesText">
+      v1.0.0 — Live AoE3 Telemetry (exact 324 XP, resource gather rates, 44-card Eco Instant Spam tracker), Russia Coach HUD, and Android Companion APK with self-updater.
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-secondary" onclick="checkForUpdates(true)">🔄 Check for Update</button>
+      <button class="btn-primary" onclick="downloadLatestApk('github')">⬇️ Update APK (GitHub Release)</button>
+      <button class="btn-secondary" onclick="downloadLatestApk('local')">📡 Download APK from LAN Server</button>
+    </div>
+  </section>
+
+</main>
+
+<script>
+const INSTALLED_VERSION = (window.AoE3Native && window.AoE3Native.getAppVersion) ? window.AoE3Native.getAppVersion() : "1.0.0";
+const GITHUB_VERSION_JSON_URL = "https://github.com/DALI951/aoe3-assistant/releases/latest/download/version.json";
+const GITHUB_API_LATEST_URL = "https://api.github.com/repos/DALI951/aoe3-assistant/releases/latest";
+const GITHUB_APK_URL = "https://github.com/DALI951/aoe3-assistant/releases/latest/download/AoE3Assistant.apk";
+
+const FALLBACK_ENDPOINTS = [
+  "http://192.168.1.154:8765",
+  "https://modali.powerpme",
+  "https://modali.powerpme.com/aoe3",
+  "http://10.0.2.2:8765"
+];
+
+// Full 44-card "Eco Instant Spam" deck from sp_St. Petersburg_homecity.xml
+const DEFAULT_CARDS = [
+  // AGE I (11 cards)
+  { index: 0, slot: 1, age: 1, dbid: 3440, tech: "HCXPDistributivism", name: "Distributivism", short_desc: "+1.25 Wood/s Trickle", category: "eco", used: false, recommended: true },
+  { index: 1, slot: 2, age: 1, dbid: 3387, tech: "HCXPEconomicTheory", name: "Economic Theory", short_desc: "+10% All Villager Gather", category: "eco", used: false, recommended: false },
+  { index: 2, slot: 3, age: 1, dbid: 2286, tech: "HCFurrierTeam", name: "TEAM Furrier", short_desc: "+15% Hunt & Berry Gather", category: "eco", used: false, recommended: false },
+  { index: 3, slot: 4, age: 1, dbid: 2573, tech: "HCShipWoodCrates1", name: "300 Wood", short_desc: "300 Wood Crates", category: "crate", used: false, recommended: false },
+  { index: 4, slot: 5, age: 1, dbid: 2572, tech: "HCShipFoodCrates1", name: "300 Food", short_desc: "300 Food Crates", category: "crate", used: false, recommended: false },
+  { index: 5, slot: 6, age: 1, dbid: 1796, tech: "HCAdvancedTradingPost", name: "Adv. Trading Post", short_desc: "-35% TP Cost, +HP/Atk", category: "upgrade", used: false, recommended: false },
+  { index: 6, slot: 7, age: 1, dbid: 2090, tech: "HCSawmills", name: "Sawmills", short_desc: "+15% Wood Gather Rate", category: "eco", used: false, recommended: false },
+  { index: 7, slot: 8, age: 1, dbid: 2091, tech: "HCExoticHardwoods", name: "Exotic Hardwoods", short_desc: "+20% Wood Gather Rate", category: "eco", used: false, recommended: false },
+  { index: 8, slot: 9, age: 1, dbid: 3388, tech: "HCXPLandGrab", name: "Land Grab", short_desc: "-40% Mill & Estate Wood Cost", category: "eco", used: false, recommended: false },
+  { index: 9, slot: 10, age: 1, dbid: 2094, tech: "HCFoodSilos", name: "Food Silos", short_desc: "+15% Mill Food Gather", category: "eco", used: false, recommended: false },
+  { index: 10, slot: 11, age: 1, dbid: 2101, tech: "HCRumDistillery", name: "Rum Distillery", short_desc: "+20% Estate Coin Gather", category: "eco", used: false, recommended: false },
+
+  // AGE II (11 cards)
+  { index: 11, slot: 1, age: 2, dbid: 2212, tech: "HCShipWoodCrates3", name: "700 Wood", short_desc: "700 Wood Crates (Blockhouse/TC)", category: "crate", used: false, recommended: false },
+  { index: 12, slot: 2, age: 2, dbid: 2215, tech: "HCShipCoinCrates3", name: "700 Coin", short_desc: "700 Coin Crates (Fast Fortress)", category: "crate", used: false, recommended: false },
+  { index: 13, slot: 3, age: 2, dbid: 2209, tech: "HCShipFoodCrates3", name: "700 Food", short_desc: "700 Food Crates (Age Up / Batches)", category: "crate", used: false, recommended: false },
+  { index: 14, slot: 4, age: 2, dbid: 2035, tech: "HCMedicine", name: "Medicine", short_desc: "-15% Settler Batch Train Time", category: "eco", used: false, recommended: false },
+  { index: 15, slot: 5, age: 2, dbid: 2098, tech: "HCSpiceTrade", name: "Spice Trade", short_desc: "+20% Hunt & Berry Gather", category: "eco", used: false, recommended: false },
+  { index: 16, slot: 6, age: 2, dbid: 2287, tech: "HCShipStrelets1", name: "13 Strelets", short_desc: "13 Strelets Light Infantry", category: "military", used: false, recommended: false },
+  { index: 17, slot: 7, age: 2, dbid: 2297, tech: "HCShipCossacks4", name: "5 Cossacks", short_desc: "5 Cossack Hand Cavalry", category: "military", used: false, recommended: false },
+  { index: 18, slot: 8, age: 2, dbid: 2037, tech: "HCFencingSchool", name: "Fencing School", short_desc: "-40% Infantry Train Time (Spam!)", category: "spam", used: false, recommended: false },
+  { index: 19, slot: 9, age: 2, dbid: 2443, tech: "HCDuelingSchoolTeam", name: "TEAM Dueling School", short_desc: "-25% Team Infantry Train Time", category: "spam", used: false, recommended: false },
+  { index: 20, slot: 10, age: 2, dbid: 2038, tech: "HCRidingSchool", name: "Riding School", short_desc: "-40% Cavalry Train Time", category: "spam", used: false, recommended: false },
+  { index: 21, slot: 11, age: 2, dbid: 2171, tech: "HCUniqueCombatRussian", name: "Boyars", short_desc: "+15% Cossack/Strelet/Oprichnik HP&Atk", category: "upgrade", used: false, recommended: false },
+
+  // AGE III (11 cards)
+  { index: 22, slot: 1, age: 3, dbid: 2190, tech: "HCShipCoveredWagons", name: "Covered Wagon", short_desc: "+1 Town Center Wagon (3-Settler Boom)", category: "boom", used: false, recommended: false },
+  { index: 23, slot: 2, age: 3, dbid: 2213, tech: "HCShipWoodCrates4", name: "1000 Wood", short_desc: "1000 Wood Crates", category: "crate", used: false, recommended: false },
+  { index: 24, slot: 3, age: 3, dbid: 2216, tech: "HCShipCoinCrates4", name: "1000 Coin", short_desc: "1000 Coin Crates", category: "crate", used: false, recommended: false },
+  { index: 25, slot: 4, age: 3, dbid: 3463, tech: "HCXPSuvorovReforms", name: "Suvorov Reforms", short_desc: "Strelets transform into Musketeers!", category: "spam", used: false, recommended: false },
+  { index: 26, slot: 5, age: 3, dbid: 2291, tech: "HCStreletsCombatRussian", name: "Strelet Combat", short_desc: "+15% Strelet HP & Attack", category: "upgrade", used: false, recommended: false },
+  { index: 27, slot: 6, age: 3, dbid: 2167, tech: "HCCavalryCombatRussian", name: "Cavalry Combat", short_desc: "+15% Cavalry HP & Attack", category: "upgrade", used: false, recommended: false },
+  { index: 28, slot: 7, age: 3, dbid: 2192, tech: "HCShipFalconets1", name: "2 Falconets", short_desc: "2 Field Guns (Anti-Infantry Push)", category: "artillery", used: false, recommended: false },
+  { index: 29, slot: 8, age: 3, dbid: 2634, tech: "HCShipMusketeersRussian2", name: "11 Musketeers", short_desc: "11 Russian Musketeers", category: "military", used: false, recommended: false },
+  { index: 30, slot: 9, age: 3, dbid: 2299, tech: "HCShipOprichniks2", name: "7 Oprichniks", short_desc: "7 Raid & Siege Cavalry", category: "military", used: false, recommended: false },
+  { index: 31, slot: 10, age: 3, dbid: 2041, tech: "HCRefrigeration", name: "Refrigeration", short_desc: "+20% Mill Food Gather Rate", category: "eco", used: false, recommended: false },
+  { index: 32, slot: 11, age: 3, dbid: 2093, tech: "HCRoyalMint", name: "Royal Mint", short_desc: "+25% Estate Coin Gather Rate", category: "eco", used: false, recommended: false },
+
+  // AGE IV (11 cards)
+  { index: 33, slot: 1, age: 4, dbid: 625, tech: "HCUnlockFactory", name: "Factory", short_desc: "Factory Wagon (7.15 Res/s or Heavy Cannon)", category: "boom", used: false, recommended: false },
+  { index: 34, slot: 2, age: 4, dbid: 3345, tech: "HCXPIndustrialRevolution", name: "Robber Barons", short_desc: "2nd Factory Wagon (Double Factory!)", category: "boom", used: false, recommended: false },
+  { index: 35, slot: 3, age: 4, dbid: 2589, tech: "HCSpawnStrelet", name: "Sevastopol / Strelet", short_desc: "Instant Blockhouse / Strelet Spawn", category: "spam", used: false, recommended: false },
+  { index: 36, slot: 4, age: 4, dbid: 2076, tech: "HCAdvancedArtillery", name: "Advanced Artillery", short_desc: "Artillery Upgrades & Fast Train", category: "artillery", used: false, recommended: false },
+  { index: 37, slot: 5, age: 4, dbid: 2239, tech: "HCShipCannons1", name: "3 Heavy Cannons", short_desc: "3 Heavy Cannons (Endgame Push)", category: "artillery", used: false, recommended: false },
+  { index: 38, slot: 6, age: 4, dbid: 2590, tech: "HCUnicorne", name: "Unicorne", short_desc: "Russian Artillery Range & Area Damage", category: "artillery", used: false, recommended: false },
+  { index: 39, slot: 7, age: 4, dbid: 2635, tech: "HCShipMusketeersRussian3", name: "17 Musketeers", short_desc: "17 Russian Musketeers", category: "military", used: false, recommended: false },
+  { index: 40, slot: 8, age: 4, dbid: 2296, tech: "HCShipCossacks3", name: "9 Cossacks", short_desc: "9 Cossack Cavalry", category: "military", used: false, recommended: false },
+  { index: 41, slot: 9, age: 4, dbid: 3376, tech: "HCXPShipOprichniks4", name: "13 Oprichniks", short_desc: "13 Oprichniks (Base Eraser Box)", category: "military", used: false, recommended: false },
+  { index: 42, slot: 10, age: 4, dbid: 3521, tech: "HCShipCoinCrates5", name: "1600 Coin", short_desc: "1600 Coin Crates", category: "crate", used: false, recommended: false },
+  { index: 43, slot: 11, age: 4, dbid: 2290, tech: "HCShipStrelets4", name: "33 Strelets", short_desc: "33 Strelets Mass Army Shipment", category: "military", used: false, recommended: false }
+];
+
+let currentState = {
+  connected: true,
+  process_name: "age3y.exe",
+  pid: 448,
+  player_name: "dali",
+  civ: "Russians",
+  homecity: "St. Petersburg",
+  food: 838.24,
+  wood: 289.33,
+  coin: 106.56,
+  food_per_sec: 0.0,
+  wood_per_sec: 0.0,
+  coin_per_sec: 0.0,
+  pop: 5,
+  pop_cap: 10,
+  pop_headroom: 5,
+  villagers: 5,
+  shipments_available: 1,
+  xp_current: 321.0,
+  xp_needed_next: 324,
+  xp_next_threshold: 645.0,
+  xp_prev_threshold: 300.0,
+  xp_progress_pct: 6.1,
+  next_shipment_number: 2,
+  age: 1,
+  age_roman: "I",
+  age_name: "Discovery Age",
+  game_time_sec: 162.086,
+  game_time_formatted: "02:42",
+  in_war: false,
+  war_status: "PEACE — Eco & Age-Up Phase",
+  unit_loss_count: 0,
+  tc_batch_timer_sec: 18.0,
+  tc_batch_cycle_sec: 53.0,
+  tc_idle_warning: false,
+  tc_status: "838 Food banked (>= 800F): Click Age Up to Colonial Age, or queue 3 Settlers (270F)!",
+  deck_name: "Eco Instant Spam",
+  cards: DEFAULT_CARDS,
+  recommended_card: {
+    dbid: 3440,
+    tech: "HCXPDistributivism",
+    name: "Distributivism",
+    short_desc: "+1.25 Wood/s Trickle",
+    age: 1,
+    reason: "1 Shipment ready in Age I! Send Distributivism (+1.25 Wood/s passive trickle) or Economic Theory (+10% all gather)."
+  },
+  coach_advice: "1 SHIPMENT READY + 838 FOOD BANKED! Click Age Up to Colonial Age (800 Food) right now, and send Distributivism (+1.25 Wood/s trickle) or Economic Theory (+10% gather)!",
+  alerts: [
+    {
+      level: "urgent",
+      type: "shipment",
+      title: "1 Shipment Available (324 XP to Shipment #2)",
+      message: "Send Distributivism (+1.25 Wood/s trickle) or Economic Theory (+10% all gather rates)."
+    },
+    {
+      level: "warning",
+      type: "macro",
+      title: "838 Food Banked — Ready to Age Up (800F)!",
+      message: "You have 838.24 Food in Discovery Age. Start Colonial Age politician or queue a 3-Settler batch (270F)."
+    }
+  ]
+};
+
+let serverUrl = "http://192.168.1.154:8765";
+let ttsEnabled = true;
+let activeCardFilter = "all";
+let latestApkUrl = GITHUB_APK_URL;
+let latestApkVersion = INSTALLED_VERSION;
+let failCount = 0;
+let lastSpokenKey = "";
+let lastSpokenTime = 0;
+let reqCounter = 1;
+let activeWs = null;
+let wsConnected = false;
+const pendingNativeReqs = {};
+
+function connectWebSocketStream() {
+  try {
+    if (activeWs) {
+      try { activeWs.close(); } catch (e) {}
+      activeWs = null;
+    }
+    const wsUrl = serverUrl.replace(/^http/i, "ws") + "/api/stream";
+    const ws = new WebSocket(wsUrl);
+    activeWs = ws;
+    ws.onopen = function() {
+      wsConnected = true;
+    };
+    ws.onmessage = function(ev) {
+      if (ev && ev.data) {
+        try {
+          const msg = JSON.parse(ev.data);
+          if (msg && (msg.food !== undefined || msg.state || msg.telemetry)) {
+            failCount = 0;
+            renderState(msg);
+            updateConnectionUi(true, "WS " + serverUrl.replace(/^https?:\/\//i, ""));
+          }
+        } catch (e) {}
+      }
+    };
+    ws.onclose = function() {
+      wsConnected = false;
+    };
+    ws.onerror = function() {
+      wsConnected = false;
+    };
+  } catch (e) {
+    wsConnected = false;
+  }
+}
+
+window.__onNativeHttp = function(reqId, status, body) {
+  const cb = pendingNativeReqs[reqId];
+  if (cb) {
+    delete pendingNativeReqs[reqId];
+    cb(status, body);
+  }
+};
+
+function httpGetJson(url, timeoutMs = 3500) {
+  return new Promise((resolve, reject) => {
+    if (window.AoE3Native && window.AoE3Native.httpGetAsync) {
+      const id = "req_" + (reqCounter++) + "_" + Date.now();
+      const timer = setTimeout(() => {
+        if (pendingNativeReqs[id]) {
+          delete pendingNativeReqs[id];
+          reject(new Error("Timeout"));
+        }
+      }, timeoutMs + 500);
+      pendingNativeReqs[id] = (status, body) => {
+        clearTimeout(timer);
+        if (status >= 200 && status < 400 && body) {
+          try {
+            resolve(JSON.parse(body));
+          } catch (e) {
+            reject(e);
+          }
+        } else {
+          reject(new Error("HTTP " + status));
+        }
+      };
+      window.AoE3Native.httpGetAsync(id, url);
+    } else {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), timeoutMs);
+      fetch(url, { signal: ctrl.signal, headers: { "Accept": "application/json" } })
+        .then(r => {
+          clearTimeout(t);
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.json();
+        })
+        .then(resolve)
+        .catch(err => {
+          clearTimeout(t);
+          reject(err);
+        });
+    }
+  });
+}
+
+function speakAlert(text, key) {
+  if (!ttsEnabled || !text) return;
+  const now = Date.now();
+  if (key && key === lastSpokenKey && (now - lastSpokenTime) < 18000) return;
+  if ((now - lastSpokenTime) < 5000) return;
+  lastSpokenKey = key || text;
+  lastSpokenTime = now;
+
+  if (window.AoE3Native && window.AoE3Native.speak) {
+    window.AoE3Native.speak(text);
+  } else if (window.speechSynthesis) {
+    try {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = 1.05;
+      window.speechSynthesis.speak(u);
+    } catch (e) {}
+  }
+}
+
+function vibratePhone(ms) {
+  if (window.AoE3Native && window.AoE3Native.vibrate) {
+    window.AoE3Native.vibrate(ms);
+  } else if (navigator.vibrate) {
+    navigator.vibrate(ms);
+  }
+}
+
+function toggleTts() {
+  ttsEnabled = !ttsEnabled;
+  if (window.AoE3Native && window.AoE3Native.setTtsEnabled) {
+    window.AoE3Native.setTtsEnabled(ttsEnabled);
+  }
+  updateTtsButton();
+  if (ttsEnabled) {
+    speakAlert("Russia Coach voice alerts enabled.", "tts_on");
+  }
+}
+
+function updateTtsButton() {
+  const btn = document.getElementById("btnTtsToggle");
+  btn.textContent = ttsEnabled ? "🔊 TTS: ON" : "🔇 TTS: OFF";
+  btn.classList.toggle("active", ttsEnabled);
+}
+
+function testVoiceAlert() {
+  lastSpokenTime = 0;
+  speakAlert("Russia Coach ready. 1 shipment available. 324 XP needed for next shipment. Send Distributivism.", "test_voice");
+  vibratePhone(80);
+}
+
+function toggleServerDrawer() {
+  const d = document.getElementById("serverDrawer");
+  d.classList.toggle("open");
+}
+
+function scrollToUpdater() {
+  const el = document.getElementById("updaterSection");
+  if (el) el.scrollIntoView({ behavior: "smooth" });
+  checkForUpdates(true);
+}
+
+function normalizeServerUrl(url) {
+  let u = (url || "").trim().replace(/\/+$/, "");
+  if (!u) return "http://192.168.1.154:8765";
+  if (!/^https?:\/\//i.test(u)) {
+    u = "http://" + u;
+  }
+  return u;
+}
+
+function setServerUrl(url) {
+  serverUrl = normalizeServerUrl(url);
+  document.getElementById("serverUrlInput").value = serverUrl;
+  const hostShort = serverUrl.replace(/^https?:\/\//i, "");
+  document.getElementById("serverHostBadge").textContent = hostShort;
+  if (window.AoE3Native && window.AoE3Native.saveServerUrl) {
+    window.AoE3Native.saveServerUrl(serverUrl);
+  }
+  try {
+    localStorage.setItem("aoe3_server_url", serverUrl);
+  } catch (e) {}
+  connectWebSocketStream();
+}
+
+function applyCustomServerUrl() {
+  const val = document.getElementById("serverUrlInput").value;
+  setServerUrl(val);
+  failCount = 0;
+  pollTelemetryOnce();
+}
+
+function selectServerPreset(url, btnEl) {
+  document.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
+  if (btnEl) btnEl.classList.add("active");
+  setServerUrl(url);
+  failCount = 0;
+  pollTelemetryOnce();
+}
+
+function setCardFilter(filter, btnEl) {
+  activeCardFilter = filter;
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  if (btnEl) btnEl.classList.add("active");
+  renderDeck(currentState.cards || DEFAULT_CARDS, currentState.recommended_card);
+}
+
+function formatRate(val) {
+  const n = Number(val) || 0;
+  return (n >= 0 ? "+" : "") + n.toFixed(2) + "/s";
+}
+
+function renderState(s) {
+  if (!s || typeof s !== "object") return;
+  const data = s.state || s.telemetry || s;
+  currentState = Object.assign({}, currentState, data);
+
+  const food = Number(currentState.food ?? 838.24);
+  const wood = Number(currentState.wood ?? 289.33);
+  const coin = Number(currentState.coin ?? 106.56);
+  const foodRate = Number(currentState.food_per_sec ?? 0);
+  const woodRate = Number(currentState.wood_per_sec ?? 0);
+  const coinRate = Number(currentState.coin_per_sec ?? 0);
+
+  document.getElementById("foodVal").textContent = food.toFixed(2);
+  document.getElementById("woodVal").textContent = wood.toFixed(2);
+  document.getElementById("coinVal").textContent = coin.toFixed(2);
+  document.getElementById("foodRate").textContent = formatRate(foodRate);
+  document.getElementById("woodRate").textContent = formatRate(woodRate);
+  document.getElementById("coinRate").textContent = formatRate(coinRate);
+
+  const age = Number(currentState.age || 1);
+  if (age === 1 && food >= 800) {
+    document.getElementById("foodHint").textContent = ">=800F Colonial Age-Up Ready!";
+  } else if (food >= 270) {
+    document.getElementById("foodHint").textContent = ">=270F 3-Settler Batch Ready";
+  } else {
+    document.getElementById("foodHint").textContent = (270 - Math.floor(food)) + "F to 3-Settler Batch";
+  }
+
+  document.getElementById("woodHint").textContent = wood >= 250 ? "Blockhouse (250W) Ready" : (wood >= 100 ? "House (100W) Ready" : "Gather Wood for House");
+  document.getElementById("coinHint").textContent = coin >= 1000 ? "1000C Fortress Ready!" : "Market / Upgrade Bank";
+
+  const pop = Number(currentState.pop ?? 5);
+  const popCap = Math.max(1, Number(currentState.pop_cap ?? 10));
+  const headroom = Math.max(0, popCap - pop);
+  const popPct = Math.min(100, Math.round((pop / popCap) * 100));
+  document.getElementById("popVal").textContent = pop + "/" + popCap;
+  document.getElementById("popHeadroomBadge").textContent = headroom <= 0 ? "POP CAPPED!" : ("+" + headroom + " Free");
+  document.getElementById("popHeadroomBadge").style.color = headroom <= 2 ? "var(--crimson)" : "var(--emerald)";
+  document.getElementById("popBar").style.width = popPct + "%";
+  document.getElementById("popBar").style.background = headroom <= 2 ? "var(--crimson)" : "var(--emerald)";
+  document.getElementById("popFoot").textContent = headroom <= 2 ? "BUILD HOUSE NOW (100W)!" : (popCap + " Pop Cap (" + headroom + " headroom)");
+
+  const vils = Number(currentState.villagers ?? 5);
+  document.getElementById("villagersVal").textContent = String(vils);
+  document.getElementById("vilBar").style.width = Math.min(100, Math.round((vils / 99) * 100)) + "%";
+
+  const shipments = Number(currentState.shipments_available ?? 1);
+  document.getElementById("shipmentsVal").textContent = String(shipments);
+  const shipCard = document.getElementById("shipmentCard");
+  shipCard.classList.toggle("highlight", shipments > 0);
+  document.getElementById("shipmentReadyBadge").textContent = shipments > 0 ? (shipments + " READY!") : "CHARGING";
+  document.getElementById("shipmentDeckFoot").textContent = "Deck: " + (currentState.deck_name || "Eco Instant Spam");
+
+  const xpNeeded = Math.round(Number(currentState.xp_needed_next ?? currentState.xp_needed ?? 324));
+  const xpNext = Number(currentState.xp_next_threshold ?? 645);
+  const xpPrev = Number(currentState.xp_prev_threshold ?? 300);
+  const xpCur = Number(currentState.xp_current ?? (xpNext - xpNeeded));
+  const span = Math.max(1, xpNext - xpPrev);
+  const xpPct = Math.max(0, Math.min(100, ((xpCur - xpPrev) / span) * 100));
+
+  document.getElementById("xpNeededVal").textContent = String(xpNeeded);
+  document.getElementById("xpCurrentBadge").textContent = Math.round(xpCur) + " / " + Math.round(xpNext) + " XP";
+  document.getElementById("xpBar").style.width = xpPct.toFixed(1) + "%";
+  const nextShipNum = currentState.next_shipment_number || 2;
+  document.getElementById("xpFoot").textContent = xpNeeded + " XP needed for Shipment #" + nextShipNum;
+
+  const playerName = currentState.player_name || "dali";
+  const civ = currentState.civ || "Russians";
+  const hc = currentState.homecity || "St. Petersburg";
+  document.getElementById("playerSubTitle").textContent = playerName + " • " + civ + " • " + hc;
+
+  const gameTimeStr = currentState.game_time_formatted || "02:42";
+  document.getElementById("gameTimeBadge").textContent = "⏱ " + gameTimeStr;
+
+  const ageRoman = currentState.age_roman || ["I", "II", "III", "IV", "V"][Math.max(0, Math.min(4, age - 1))];
+  const ageName = currentState.age_name || "Discovery Age";
+  document.getElementById("ageBadge").textContent = "AGE " + ageRoman + " • " + ageName.toUpperCase();
+
+  // War / Unit-loss Banner
+  const inWar = Boolean(currentState.in_war);
+  const lossCount = Number(currentState.unit_loss_count || 0);
+  const warBanner = document.getElementById("warBanner");
+  warBanner.classList.toggle("in-war", inWar);
+  document.getElementById("warIcon").textContent = inWar ? "⚔️" : "🛡️";
+  document.getElementById("warStatusText").textContent = currentState.war_status || (inWar ? "WAR ALERT — UNIT LOSS DETECTED!" : "PEACE — Eco & Age-Up Phase");
+  document.getElementById("unitLossBadge").textContent = "Losses: " + lossCount;
+
+  // Coach Advice & TC 3-Settler Reminder
+  if (currentState.coach_advice) {
+    document.getElementById("coachAdviceText").textContent = currentState.coach_advice;
+  }
+  const tcTimer = Number(currentState.tc_batch_timer_sec ?? 18);
+  const tcCycle = Math.max(1, Number(currentState.tc_batch_cycle_sec ?? 53));
+  const tcWarn = Boolean(currentState.tc_idle_warning) || tcTimer >= tcCycle;
+  const tcBox = document.getElementById("tcBox");
+  tcBox.classList.toggle("warning", tcWarn);
+  document.getElementById("tcTimerLabel").textContent = Math.round(tcTimer) + "s / " + Math.round(tcCycle) + "s • " + (tcWarn ? "TC IDLE WARNING!" : "ACTIVE");
+  document.getElementById("tcTimerLabel").style.color = tcWarn ? "var(--crimson)" : "var(--emerald)";
+  document.getElementById("tcProgressFill").style.width = Math.min(100, Math.round((tcTimer / tcCycle) * 100)) + "%";
+  if (currentState.tc_status) {
+    document.getElementById("tcStatusText").textContent = currentState.tc_status;
+  }
+
+  // Recommended card
+  const rec = currentState.recommended_card;
+  if (rec && rec.name) {
+    document.getElementById("recCardName").textContent = rec.name + " (Age " + (rec.age || 1) + " • #" + (rec.dbid || 3440) + ")";
+    document.getElementById("recCardReason").textContent = (rec.short_desc ? rec.short_desc + " — " : "") + (rec.reason || "Recommended next shipment");
+  }
+
+  // Alerts
+  renderAlerts(currentState.alerts || []);
+
+  // 44-Card Deck
+  const cards = (Array.isArray(currentState.cards) && currentState.cards.length > 0) ? currentState.cards : DEFAULT_CARDS;
+  renderDeck(cards, rec);
+
+  // Voice alerts on key conditions
+  if (inWar) {
+    speakAlert("Warning! Under attack, unit loss detected!", "war_alert");
+    vibratePhone(200);
+  } else if (tcWarn) {
+    speakAlert("Town Center idle! Queue 3 Russian settlers for 270 food.", "tc_idle");
+  } else if (shipments > 0 && rec && rec.name) {
+    speakAlert(shipments + " shipment ready. Send " + rec.name + ".", "ship_" + shipments + "_" + rec.name);
+  }
+}
+
+function renderAlerts(alerts) {
+  const container = document.getElementById("alertsList");
+  if (!Array.isArray(alerts) || alerts.length === 0) {
+    container.innerHTML = "";
+    return;
+  }
+  container.innerHTML = alerts.slice(0, 3).map(a => {
+    const lvl = (a.level || "info").toLowerCase();
+    return `
+      <div class="alert-item ${lvl}">
+        <div class="alert-title">${escapeHtml(a.title || "Coach Alert")}</div>
+        <div class="alert-msg">${escapeHtml(a.message || "")}</div>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderDeck(cards, recCard) {
+  const grid = document.getElementById("deckGrid");
+  const recDbid = recCard ? Number(recCard.dbid) : 3440;
+  const recTech = recCard && recCard.tech ? String(recCard.tech).toLowerCase() : "hcxpdistributivism";
+
+  let sentCount = 0;
+  cards.forEach(c => { if (c.used || c.sent) sentCount++; });
+  document.getElementById("deckNameTitle").textContent = currentState.deck_name || "Eco Instant Spam";
+  document.getElementById("deckStatsSub").textContent =
+    cards.length + " Total • " + sentCount + " Sent • " + (cards.length - sentCount) + " Available across Age I-IV";
+
+  const filtered = cards.filter(c => {
+    const isUsed = Boolean(c.used || c.sent);
+    if (activeCardFilter === "all") return true;
+    if (activeCardFilter === "ready") return !isUsed;
+    if (activeCardFilter === "used") return isUsed;
+    return String(c.age) === activeCardFilter;
+  });
+
+  grid.innerHTML = filtered.map((c, idx) => {
+    const isUsed = Boolean(c.used || c.sent);
+    const isRec = !isUsed && (Boolean(c.recommended) || Number(c.dbid) === recDbid || String(c.tech || "").toLowerCase() === recTech);
+    const ageNum = Number(c.age || 1);
+    const ageRoman = ["I", "II", "III", "IV"][Math.max(0, Math.min(3, ageNum - 1))];
+    const badgeClass = isUsed ? "sent" : (isRec ? "rec" : "ready");
+    const badgeText = isUsed ? "✓ SENT" : (isRec ? "★ NEXT PICK" : "READY");
+    return `
+      <div class="deck-card ${isRec ? "recommended" : ""} ${isUsed ? "used" : ""}">
+        <div class="dc-top">
+          <span class="dc-age age-${ageNum}">AGE ${ageRoman} • #${c.slot || (idx + 1)}</span>
+          <span class="dc-badge ${badgeClass}">${badgeText}</span>
+        </div>
+        <div class="dc-name">${escapeHtml(c.name || c.tech || "Card")}</div>
+        <div class="dc-desc">${escapeHtml(c.short_desc || c.category || "Home City Shipment")}</div>
+        <div class="dc-tech">${escapeHtml(c.tech || "")} (dbid ${c.dbid || ""})</div>
+      </div>
+    `;
+  }).join("");
+}
+
+function escapeHtml(s) {
+  return String(s || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function updateConnectionUi(ok, sourceLabel) {
+  const dot = document.getElementById("connDot");
+  const txt = document.getElementById("connStatusText");
+  const syncInfo = document.getElementById("lastSyncInfo");
+  const nowStr = new Date().toLocaleTimeString();
+  if (ok) {
+    dot.className = "dot";
+    const pid = currentState.pid || 448;
+    const proc = currentState.process_name || "age3y.exe";
+    txt.textContent = "LIVE • " + proc + " (PID " + pid + ")";
+    syncInfo.textContent = "Last sync: " + nowStr + " via " + sourceLabel;
+  } else {
+    dot.className = "dot warn";
+    txt.textContent = "CACHED SNAPSHOT • Reconnecting (" + sourceLabel + ")";
+    syncInfo.textContent = "Auto-probing LAN & modali.powerpme (" + nowStr + ")";
+  }
+}
+
+async function pollTelemetryOnce() {
+  const stateUrl = serverUrl.endsWith("/api/state") ? serverUrl : (serverUrl + "/api/state");
+  try {
+    const data = await httpGetJson(stateUrl, 2800);
+    if (data && (data.food !== undefined || data.state || data.telemetry)) {
+      failCount = 0;
+      renderState(data);
+      updateConnectionUi(true, serverUrl.replace(/^https?:\/\//i, ""));
+      return;
+    }
+  } catch (e) {
+    failCount++;
+  }
+
+  // Smart auto-failover across preset endpoints if current URL fails >= 2 times
+  if (failCount >= 2) {
+    for (const candidate of FALLBACK_ENDPOINTS) {
+      if (candidate === serverUrl) continue;
+      try {
+        const probeData = await httpGetJson(candidate + "/api/state", 2200);
+        if (probeData && (probeData.food !== undefined || probeData.state || probeData.telemetry)) {
+          setServerUrl(candidate);
+          failCount = 0;
+          renderState(probeData);
+          updateConnectionUi(true, candidate.replace(/^https?:\/\//i, ""));
+          return;
+        }
+      } catch (ignored) {}
+    }
+  }
+  updateConnectionUi(false, serverUrl.replace(/^https?:\/\//i, ""));
+}
+
+function compareSemver(a, b) {
+  const pa = String(a || "1.0.0").replace(/^v/i, "").split(".").map(Number);
+  const pb = String(b || "1.0.0").replace(/^v/i, "").split(".").map(Number);
+  for (let i = 0; i < 3; i++) {
+    const na = pa[i] || 0;
+    const nb = pb[i] || 0;
+    if (na > nb) return 1;
+    if (na < nb) return -1;
+  }
+  return 0;
+}
+
+async function checkForUpdates(userTriggered = false) {
+  const pill = document.getElementById("updaterStatusPill");
+  if (userTriggered) {
+    pill.textContent = "CHECKING...";
+  }
+  let manifest = null;
+
+  // 1. Check active server /api/version first
+  try {
+    manifest = await httpGetJson(serverUrl + "/api/version", 3000);
+  } catch (e) {}
+
+  // 2. Also check GitHub Releases version.json
+  if (!manifest || !manifest.apk_version) {
+    try {
+      manifest = await httpGetJson(GITHUB_VERSION_JSON_URL, 3500);
+    } catch (e) {}
+  }
+
+  // 3. Fallback to GitHub Releases API latest tag
+  if (!manifest || !manifest.apk_version) {
+    try {
+      const gh = await httpGetJson(GITHUB_API_LATEST_URL, 3500);
+      if (gh && gh.tag_name) {
+        const ver = String(gh.tag_name).replace(/^v/i, "");
+        manifest = {
+          apk_version: ver,
+          apk_url: GITHUB_APK_URL,
+          release_notes: gh.body || ("GitHub Release " + gh.tag_name)
+        };
+      }
+    } catch (e) {}
+  }
+
+  if (manifest && (manifest.apk_version || manifest.version)) {
+    latestApkVersion = String(manifest.apk_version || manifest.version || INSTALLED_VERSION).replace(/^v/i, "");
+    latestApkUrl = manifest.apk_url || GITHUB_APK_URL;
+    document.getElementById("remoteApkVer").textContent = "v" + latestApkVersion;
+    if (manifest.release_notes) {
+      document.getElementById("releaseNotesText").textContent = manifest.release_notes;
+    }
+    const cmp = compareSemver(latestApkVersion, INSTALLED_VERSION);
+    if (cmp > 0) {
+      pill.textContent = "UPDATE AVAILABLE (v" + latestApkVersion + ")";
+      pill.style.background = "var(--crimson-dim)";
+      pill.style.color = "#fda4af";
+      if (userTriggered && window.AoE3Native && window.AoE3Native.showToast) {
+        window.AoE3Native.showToast("New APK v" + latestApkVersion + " available! Tap Update APK.");
+      }
+    } else {
+      pill.textContent = "UP TO DATE (v" + INSTALLED_VERSION + ")";
+      if (userTriggered && window.AoE3Native && window.AoE3Native.showToast) {
+        window.AoE3Native.showToast("AoE3 Russia Coach v" + INSTALLED_VERSION + " is up to date!");
+      }
+    }
+  } else {
+    pill.textContent = "v" + INSTALLED_VERSION + " READY";
+  }
+}
+
+function downloadLatestApk(source) {
+  let targetUrl = latestApkUrl || GITHUB_APK_URL;
+  if (source === "local") {
+    targetUrl = serverUrl + "/releases/AoE3Assistant.apk";
+  }
+  if (window.AoE3Native && window.AoE3Native.downloadApk) {
+    window.AoE3Native.downloadApk(targetUrl, latestApkVersion || INSTALLED_VERSION);
+  } else {
+    window.open(targetUrl, "_blank");
+  }
+}
+
+// Initialize on load
+(function init() {
+  document.getElementById("installedApkVer").textContent = "v" + INSTALLED_VERSION;
+  document.getElementById("headerVerBadge").textContent = "v" + INSTALLED_VERSION;
+
+  if (window.AoE3Native && window.AoE3Native.getSavedServerUrl) {
+    const saved = window.AoE3Native.getSavedServerUrl();
+    if (saved) setServerUrl(saved);
+  } else {
+    try {
+      const saved = localStorage.getItem("aoe3_server_url");
+      if (saved) setServerUrl(saved);
+    } catch (e) {}
+  }
+
+  if (window.AoE3Native && window.AoE3Native.getTtsEnabled) {
+    ttsEnabled = Boolean(window.AoE3Native.getTtsEnabled());
+    updateTtsButton();
+  }
+
+  renderState(currentState);
+  connectWebSocketStream();
+  pollTelemetryOnce();
+  setInterval(pollTelemetryOnce, 1000);
+  setTimeout(() => checkForUpdates(false), 1500);
+})();
+</script>
+</body>
+</html>
