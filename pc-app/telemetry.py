@@ -135,19 +135,20 @@ class PROCESSENTRY32W(ctypes.Structure):
 
 class GatherRateFilter:
     """
-    Calculates exact `food_per_sec`, `wood_per_sec`, `coin_per_sec`, and `xp_per_sec`
+    Calculates exact responsive `food_per_sec`, `wood_per_sec`, `coin_per_sec`, and `xp_per_sec`
     from 1 Hz samples while filtering out training spend drops and shipment crate spikes.
+    Uses a responsive 3.0s sliding window so drops (e.g. 25/s -> 11/s or 0/s) reflect immediately.
     """
 
-    def __init__(self, window_sec: float = 8.0):
+    def __init__(self, window_sec: float = 3.0):
         self.window_sec = window_sec
         self._last_time: Optional[float] = None
         self._last_vals: Dict[str, float] = {}
         self._deltas: Dict[str, Deque[Tuple[float, float, float]]] = {
-            "food": deque(maxlen=15),
-            "wood": deque(maxlen=15),
-            "coin": deque(maxlen=15),
-            "xp": deque(maxlen=15),
+            "food": deque(maxlen=8),
+            "wood": deque(maxlen=8),
+            "coin": deque(maxlen=8),
+            "xp": deque(maxlen=8),
         }
         self._rates: Dict[str, float] = {
             "food": 0.0,
@@ -197,12 +198,12 @@ class GatherRateFilter:
         current = {"food": food, "wood": wood, "coin": coin, "xp": xp}
         for key in ("food", "wood", "coin", "xp"):
             delta = current[key] - self._last_vals.get(key, current[key])
-            inst_rate = delta / dt
+            inst_rate = delta / dt if dt > 0.0 else 0.0
 
             is_spend_drop = delta < -5.0
-            is_crate_spike = delta > 120.0 or inst_rate > 55.0
+            is_crate_spike = delta > 150.0 or inst_rate > 90.0
 
-            if not is_spend_drop and not is_crate_spike and dt <= 15.0:
+            if not is_spend_drop and not is_crate_spike and dt <= 8.0:
                 self._deltas[key].append((game_time_sec, max(0.0, delta), dt))
 
             q = self._deltas[key]
@@ -212,7 +213,9 @@ class GatherRateFilter:
             if q:
                 sum_d = sum(item[1] for item in q)
                 sum_dt = sum(item[2] for item in q)
-                self._rates[key] = round(sum_d / sum_dt, 2) if sum_dt > 0.05 else 0.0
+                self._rates[key] = round(sum_d / sum_dt, 1) if sum_dt > 0.05 else 0.0
+            else:
+                self._rates[key] = 0.0
 
         self._last_time = game_time_sec
         self._last_vals = current
@@ -238,7 +241,7 @@ class TelemetryReader:
         self.process_name = process_name
         self.homecity_xml_path = homecity_xml_path
         self.coach = CoachEngine(homecity_xml_path=homecity_xml_path)
-        self.rate_filter = GatherRateFilter(window_sec=8.0)
+        self.rate_filter = GatherRateFilter(window_sec=3.0)
 
         self._kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
         self._setup_win32()

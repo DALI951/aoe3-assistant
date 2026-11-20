@@ -1,8 +1,8 @@
 {
-  "version": "1.2.0",
-  "exe_version": "1.2.0",
-  "apk_version": "1.2.0",
-  "tag": "v1.2.0",
+  "version": "1.3.0",
+  "exe_version": "1.3.0",
+  "apk_version": "1.3.0",
+  "tag": "v1.3.0",
   "repo": "DALI951/aoe3-assistant",
   "repo_url": "https://github.com/DALI951/aoe3-assistant",
   "version_json_url": "https://github.com/DALI951/aoe3-assistant/releases/latest/download/version.json",
@@ -13,6 +13,6 @@
   "local_exe_url": "/releases/AoE3Assistant.exe",
   "local_setup_url": "/releases/AoE3AssistantSetup.exe",
   "local_apk_url": "/releases/AoE3Assistant.apk",
-  "release_notes": "v1.1.0 - Zero defaults when game not running, accurate Match State (PLAYING / PAUSED / WAITING_FOR_MATCH / GAME_NOT_RUNNING), XP/s income rate, accurate used/remaining card count, F12 hotkey, draggable HUD overlay, silent mode (all TTS/sound removed), and clean uncramped Android layout.",
+  "release_notes": "v1.2.0 - Zero defaults when game closed/waiting, Playing vs. Paused detection, XP/s calculation, accurate used card counting, F12 hotkey, freely draggable floating overlay, startup background service, standard Setup Wizard, completely removed voice/TTS sounds, and clean spacious Android companion UI.",
   "published_at": "2026-11-19T22:00:00Z"
 }

@@ -46,10 +46,10 @@ CLOUDFLARED_CANDIDATES = [
 
 GITHUB_REPO = "DALI951/aoe3-assistant"
 DEFAULT_VERSION_MANIFEST = {
-    "version": "1.2.0",
-    "exe_version": "1.2.0",
-    "apk_version": "1.2.0",
-    "tag": "v1.2.0",
+    "version": "1.3.0",
+    "exe_version": "1.3.0",
+    "apk_version": "1.3.0",
+    "tag": "v1.3.0",
     "repo": GITHUB_REPO,
     "repo_url": f"https://github.com/{GITHUB_REPO}",
     "version_json_url": f"https://github.com/{GITHUB_REPO}/releases/latest/download/version.json",

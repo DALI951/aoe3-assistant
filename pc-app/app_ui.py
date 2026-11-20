@@ -38,7 +38,7 @@ import urllib.error
 import urllib.request
 import winreg
 
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.3.0"
 APP_NAME = "AoE3 Live Rates Overlay"
 REG_RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 REG_RUN_VALUE = "AoE3Assistant"
@@ -571,22 +571,22 @@ class DraggableFloatingOverlay:
         self.update_btn.pack(side=tk.RIGHT, padx=4)
         self.update_btn.bind("<Button-1>", lambda _e: self.on_click_check_updates())
 
-        # Middle Row: 4 Real-Time Rate Columns ONLY
+        # Middle Row: 4 Real-Time Rate Columns with Total Resource Stockpile
         rates_frame = tk.Frame(self.container, bg=self.BG_MAIN)
         rates_frame.pack(fill=tk.X, pady=2)
         self._bind_drag(rates_frame)
 
-        self.food_card, self.food_val = self._create_rate_column(
-            rates_frame, "🥩 FOOD/s", "+0.0 /s", "#ff7b7b"
+        self.food_card, self.food_val, self.food_total = self._create_rate_column(
+            rates_frame, "🥩 FOOD", "+0.0 /s", "0", "#ff7b7b"
         )
-        self.wood_card, self.wood_val = self._create_rate_column(
-            rates_frame, "🌲 WOOD/s", "+0.0 /s", "#e3b341"
+        self.wood_card, self.wood_val, self.wood_total = self._create_rate_column(
+            rates_frame, "🌲 WOOD", "+0.0 /s", "0", "#e3b341"
         )
-        self.coin_card, self.coin_val = self._create_rate_column(
-            rates_frame, "🪙 COIN/s", "+0.0 /s", "#ffd95e"
+        self.coin_card, self.coin_val, self.coin_total = self._create_rate_column(
+            rates_frame, "🪙 COIN", "+0.0 /s", "0", "#ffd95e"
         )
-        self.xp_card, self.xp_val = self._create_rate_column(
-            rates_frame, "⚡ XP/s", "+0.0 /s", self.GREEN
+        self.xp_card, self.xp_val, self.xp_total = self._create_rate_column(
+            rates_frame, "⚡ XP", "+0.0 /s", "0", self.GREEN
         )
 
         # Bottom Row: Clean 1-Line Status (Vills, Shipments/Cards, Actionable Advice)
@@ -606,7 +606,7 @@ class DraggableFloatingOverlay:
         self.advice_lbl.pack(side=tk.LEFT, fill=tk.X, expand=True)
         self._bind_drag(self.advice_lbl)
 
-    def _create_rate_column(self, parent: tk.Widget, label_text: str, default_val: str, color: str):
+    def _create_rate_column(self, parent: tk.Widget, label_text: str, default_val: str, default_tot: str, color: str):
         card = tk.Frame(parent, bg=self.BG_CARD, padx=6, pady=4, cursor="fleur")
         card.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=2)
         self._bind_drag(card)
@@ -627,13 +627,24 @@ class DraggableFloatingOverlay:
             text=default_val,
             bg=self.BG_CARD,
             fg=color,
-            font=("Segoe UI", 13, "bold"),
+            font=("Segoe UI", 12, "bold"),
             cursor="fleur",
         )
         val.pack(anchor="center")
         self._bind_drag(val)
 
-        return card, val
+        tot = tk.Label(
+            card,
+            text=default_tot,
+            bg=self.BG_CARD,
+            fg="#cbd5e1",
+            font=("Segoe UI", 9),
+            cursor="fleur",
+        )
+        tot.pack(anchor="center")
+        self._bind_drag(tot)
+
+        return card, val, tot
 
     def schedule_toggle_hud(self) -> None:
         try:
@@ -696,17 +707,27 @@ class DraggableFloatingOverlay:
             self.state_badge.config(text=f"▶ PLAYING ({m:02d}:{sec:02d})", bg="#153620", fg=self.GREEN)
             self.pill_dot.config(fg=self.GREEN)
 
-        # Real-Time Rates (Strictly 0.0 when not in match!)
+        # Real-Time Rates & Stockpile Totals
         if in_match:
             fps = float(s.get("food_per_sec", 0.0) or 0.0)
             wps = float(s.get("wood_per_sec", 0.0) or 0.0)
             cps = float(s.get("coin_per_sec", 0.0) or 0.0)
             xps = float(s.get("xp_per_sec", 0.0) or 0.0)
 
+            f_tot = float(s.get("food", 0.0) or 0.0)
+            w_tot = float(s.get("wood", 0.0) or 0.0)
+            c_tot = float(s.get("coin", 0.0) or 0.0)
+            x_tot = float(s.get("xp_current", 0.0) or 0.0)
+
             self.food_val.config(text=f"{fps:+.1f} /s")
             self.wood_val.config(text=f"{wps:+.1f} /s")
             self.coin_val.config(text=f"{cps:+.1f} /s")
             self.xp_val.config(text=f"{xps:+.1f} /s")
+
+            self.food_total.config(text=f"{int(round(f_tot)):,}")
+            self.wood_total.config(text=f"{int(round(w_tot)):,}")
+            self.coin_total.config(text=f"{int(round(c_tot)):,}")
+            self.xp_total.config(text=f"{int(round(x_tot)):,}")
 
             # Footer: Compact 1-line tactical status
             vills = int(s.get("villagers", 0) or 0)
@@ -732,6 +753,10 @@ class DraggableFloatingOverlay:
             self.wood_val.config(text="+0.0 /s")
             self.coin_val.config(text="+0.0 /s")
             self.xp_val.config(text="+0.0 /s")
+            self.food_total.config(text="0")
+            self.wood_total.config(text="0")
+            self.coin_total.config(text="0")
+            self.xp_total.config(text="0")
             self.advice_lbl.config(
                 text="Game not running — run AoE3 and enter a match",
                 fg=self.TEXT_MUTED,
