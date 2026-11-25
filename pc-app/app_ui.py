@@ -38,7 +38,17 @@ import urllib.error
 import urllib.request
 import winreg
 
-APP_VERSION = "1.3.0"
+try:
+    import pystray
+    from PIL import Image, ImageDraw
+    HAS_PYSTRAY = True
+except ImportError:
+    pystray = None
+    Image = None
+    ImageDraw = None
+    HAS_PYSTRAY = False
+
+APP_VERSION = "1.4.0"
 APP_NAME = "AoE3 Live Rates Overlay"
 REG_RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 REG_RUN_VALUE = "AoE3Assistant"
@@ -404,6 +414,9 @@ class DraggableFloatingOverlay:
         self._pill_drag_x = 0
         self._pill_drag_y = 0
 
+        self.tray_icon = None
+        self._init_tray_icon()
+
         self._build_mini_pill()
         self._build_overlay_ui()
 
@@ -418,12 +431,61 @@ class DraggableFloatingOverlay:
         threading.Thread(target=self.bridge.ensure_local_server_running, daemon=True).start()
 
         if start_minimized:
+            # Complete background startup: hide BOTH the main overlay and the floating pill!
             self.root.withdraw()
+            if hasattr(self, "pill_win"):
+                self.pill_win.withdraw()
             self.hud_visible = False
-            self.pill_btn.config(text="⚔ AoE3 Rates [F12: Show]", fg=self.GREEN)
+            self.pill_visible = False
 
         self.root.after(250, self._refresh_ui_loop)
         self.root.after(2000, self.check_updates_silent)
+
+    def _generate_tray_image(self):
+        """Generate a sleek 64x64 gold-crested AoE3 icon for Windows system tray."""
+        if Image and ImageDraw:
+            img = Image.new("RGBA", (64, 64), color=(0, 0, 0, 0))
+            d = ImageDraw.Draw(img)
+            # Rounded shield / emblem background
+            d.rounded_rectangle([(4, 4), (60, 60)], radius=12, fill=(18, 24, 38, 255), outline=(245, 185, 66, 255), width=3)
+            # Gold sword / cross motif
+            d.rectangle([(30, 14), (34, 50)], fill=(251, 191, 36, 255))
+            d.rectangle([(20, 24), (44, 28)], fill=(251, 191, 36, 255))
+            return img
+        return None
+
+    def _init_tray_icon(self) -> None:
+        """Create a real Windows system tray icon in the corner near Nvidia / Lively."""
+        if not HAS_PYSTRAY:
+            return
+
+        img = self._generate_tray_image()
+        if not img:
+            return
+
+        def on_toggle_click(icon, item):
+            self.schedule_toggle_hud()
+
+        def on_exit_click(icon, item):
+            self.root.after(0, self.quit_app)
+
+        menu = pystray.Menu(
+            pystray.MenuItem("Show / Hide Overlay (F12)", on_toggle_click, default=True),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem("Exit AoE3 Assistant", on_exit_click)
+        )
+
+        self.tray_icon = pystray.Icon("aoe3_assistant", img, f"{APP_NAME} (F12)", menu)
+        threading.Thread(target=self.tray_icon.run, daemon=True, name="AoE3TrayThread").start()
+
+    def quit_app(self) -> None:
+        self._running = False
+        if self.tray_icon:
+            try:
+                self.tray_icon.stop()
+            except Exception:
+                pass
+        self.root.quit()
 
     def _build_mini_pill(self) -> None:
         """Compact floating mini pill shown when overlay is hidden."""
@@ -471,6 +533,9 @@ class DraggableFloatingOverlay:
         self.pill_btn.bind("<ButtonPress-1>", self._on_pill_press)
         self.pill_btn.bind("<B1-Motion>", self._on_pill_motion)
         self.pill_btn.bind("<ButtonRelease-1>", self._on_pill_release)
+
+        # By default start with pill hidden so nothing is in user's face unless opened
+        self.pill_win.withdraw()
 
     def _on_pill_press(self, event):
         self._pill_drag_x = event.x_root - self.pill_win.winfo_x()
@@ -656,12 +721,13 @@ class DraggableFloatingOverlay:
         if self.hud_visible:
             self.root.withdraw()
             self.hud_visible = False
-            self.pill_btn.config(text="⚔ AoE3 Rates [F12: Show]", fg=self.GREEN)
+            # When hiding, also keep floating pill hidden so the screen is completely free
+            if hasattr(self, "pill_win"):
+                self.pill_win.withdraw()
         else:
             self.root.deiconify()
             self.root.attributes("-topmost", True)
             self.hud_visible = True
-            self.pill_btn.config(text="⚔ AoE3 Rates [F12: Hide]", fg=self.GOLD_BRIGHT)
 
     def _telemetry_worker(self) -> None:
         while self._running:

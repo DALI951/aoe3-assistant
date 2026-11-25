@@ -31,7 +31,7 @@ from typing import Any, Dict, Optional
 import winreg
 
 APP_NAME = "AoE3 Live Rates Overlay & Assistant"
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.4.0"
 PUBLISHER = "DALI951 (AoE3 Assistant)"
 EXE_FILENAME = "AoE3Assistant.exe"
 REG_RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
